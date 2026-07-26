@@ -14,6 +14,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { DashboardUser } from "@/components/dashboard-user";
+
 const conversations = [
   {
     title: "Help with my billing information",
@@ -114,16 +116,7 @@ export default function Home() {
             <Settings size={18} />
             Settings
           </a>
-          <div className="mt-4 flex items-center gap-3 border-t border-slate-100 px-2 pt-5">
-            <div className="flex size-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-              AS
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">Alex Smith</p>
-              <p className="truncate text-xs text-slate-400">alex@example.com</p>
-            </div>
-            <MoreHorizontal size={17} className="text-slate-400" />
-          </div>
+          <DashboardUser variant="profile" />
         </div>
       </aside>
 
@@ -154,9 +147,7 @@ export default function Home() {
               <Bell size={17} />
               <span className="absolute top-2 right-2 size-1.5 rounded-full bg-indigo-600 ring-2 ring-white" />
             </button>
-            <div className="ml-1 flex size-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white lg:hidden">
-              AS
-            </div>
+            <DashboardUser variant="avatar" />
           </div>
         </header>
 
@@ -165,7 +156,7 @@ export default function Home() {
             <div>
               <p className="mb-1 text-sm font-medium text-indigo-600">Sunday, July 26</p>
               <h1 className="text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
-                Welcome back, Alex
+                <DashboardUser variant="greeting" />
               </h1>
               <p className="mt-2 text-sm text-slate-500">
                 Continue a conversation or start a new chat with an AI support agent.
