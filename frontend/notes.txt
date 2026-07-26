@@ -1,0 +1,5 @@
+auth
+
+- login, signup - redirects to dashboard
+- logout - redirects to login
+- visting  ogin or signup without log out - redirects to dashboard

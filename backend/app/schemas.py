@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
@@ -49,10 +50,40 @@ class ConversationStatus(str, Enum):
 class ConversationCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
 
+    @field_validator("title")
+    @classmethod
+    def title_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Title must not be blank")
+        return value
 
-class ConversationUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=1, max_length=200)
-    status: ConversationStatus | None = None
+
+class ConversationResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    title: str
+    status: ConversationStatus
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConversationTitleUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+    @field_validator("title")
+    @classmethod
+    def title_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Title must not be blank")
+        return value
+
+
+class ConversationStatusUpdate(BaseModel):
+    status: ConversationStatus
 
 
 class MessageRole(str, Enum):

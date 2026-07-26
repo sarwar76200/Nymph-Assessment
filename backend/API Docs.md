@@ -176,3 +176,27 @@
 	]
 }
 ```
+
+
+##  Create Conversation
+
+### Request
+```json
+{
+	"title": "Test"
+}
+```
+
+### Response
+
+```json
+{
+	"id": "19237fe6-4240-410a-9ace-ec1341410dd3",
+	"user_id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
+	"title": "Test",
+	"status": "active",
+	"created_at": "2026-07-26T19:49:14.392444Z",
+	"updated_at": "2026-07-26T19:49:14.392444Z"
+}
+```
+
