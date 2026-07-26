@@ -238,6 +238,9 @@ export function RecentConversations() {
   const [renameTitle, setRenameTitle] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameError, setRenameError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const recentConversations = conversations.slice(0, 4);
 
   function openRenameDialog(conversation: Conversation) {
@@ -297,6 +300,61 @@ export function RecentConversations() {
     }
   }
 
+  function openDeleteDialog(conversation: Conversation) {
+    setDeleteTarget(conversation);
+    setDeleteError("");
+    setOpenMenuId(null);
+  }
+
+  async function handleDelete() {
+    const token = getSessionToken();
+    if (!deleteTarget || !token) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/conversations/${deleteTarget.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (response.status === 401) {
+        clearSession();
+        return;
+      }
+
+      if (response.status === 404) {
+        throw new Error("This conversation is no longer available.");
+      }
+
+      if (response.status !== 204) {
+        throw new Error("Unable to delete this conversation.");
+      }
+
+      if (selectedConversation?.id === deleteTarget.id) {
+        setSelectedConversation(null);
+      }
+      await reload();
+      setDeleteTarget(null);
+    } catch (requestError) {
+      setDeleteError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to delete this conversation.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <>
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/40">
@@ -353,6 +411,7 @@ export function RecentConversations() {
                   )
                 }
                 onRename={() => openRenameDialog(conversation)}
+                onDelete={() => openDeleteDialog(conversation)}
               />
             ))}
           </div>
@@ -385,6 +444,20 @@ export function RecentConversations() {
           }}
         />
       )}
+
+      {deleteTarget && (
+        <DeleteConversationDialog
+          conversationTitle={deleteTarget.title}
+          error={deleteError}
+          isSubmitting={isDeleting}
+          onConfirm={handleDelete}
+          onCancel={() => {
+            if (!isDeleting) {
+              setDeleteTarget(null);
+            }
+          }}
+        />
+      )}
     </>
   );
 }
@@ -395,6 +468,7 @@ type ConversationRowProps = {
   onOpen: () => void;
   onToggleMenu: () => void;
   onRename: () => void;
+  onDelete: () => void;
 };
 
 function ConversationRow({
@@ -403,6 +477,7 @@ function ConversationRow({
   onOpen,
   onToggleMenu,
   onRename,
+  onDelete,
 }: ConversationRowProps) {
   return (
     <div className="flex items-center transition hover:bg-slate-50/70">
@@ -463,15 +538,98 @@ function ConversationRow({
             </button>
             <button
               type="button"
-              disabled
-              title="Delete will be available later"
-              className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-400 opacity-60"
+              onClick={onDelete}
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
             >
               <Trash2 size={15} />
               Delete conversation
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+type DeleteConversationDialogProps = {
+  conversationTitle: string;
+  error: string;
+  isSubmitting: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+function DeleteConversationDialog({
+  conversationTitle,
+  error,
+  isSubmitting,
+  onConfirm,
+  onCancel,
+}: DeleteConversationDialogProps) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-[2px]">
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-conversation-title"
+        aria-describedby="delete-conversation-description"
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+            <Trash2 size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 id="delete-conversation-title" className="font-semibold text-slate-900">
+              Delete conversation?
+            </h2>
+            <p
+              id="delete-conversation-description"
+              className="mt-2 text-sm leading-6 text-slate-500"
+            >
+              <span className="font-medium text-slate-700">
+                &ldquo;{conversationTitle}&rdquo;
+              </span>{" "}
+              will be permanently deleted. This action cannot be undone.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close delete dialog"
+            disabled={isSubmitting}
+            onClick={onCancel}
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+          >
+            <X size={17} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-xs text-red-700">
+            <AlertCircle size={15} className="shrink-0" />
+            {error}
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={onCancel}
+            className="h-10 rounded-lg px-4 text-sm font-semibold text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={onConfirm}
+            className="flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting && <LoaderCircle size={15} className="animate-spin" />}
+            {isSubmitting ? "Deleting..." : "Delete conversation"}
+          </button>
+        </div>
       </div>
     </div>
   );
