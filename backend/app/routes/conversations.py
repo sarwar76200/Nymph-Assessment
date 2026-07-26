@@ -1,3 +1,6 @@
+import asyncio
+import random
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -5,17 +8,25 @@ from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import CurrentUser, DatabaseSession
-from app.models import Conversation, User
+from app.models import Conversation, Message, User
 from app.schemas import (
     ConversationCreate,
     ConversationResponse,
     ConversationStatusUpdate,
     ConversationTitleUpdate,
     MessageCreate,
+    MessageResponse,
     PlaceholderResponse,
 )
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
+ASSISTANT_RESPONSES = (
+    "Thanks for reaching out. I am happy to help with that.",
+    "I understand your concern. Let me look into this for you.",
+    "I have reviewed your message and will guide you through the next steps.",
+    "That is a good question. Here is what I recommend.",
+    "Thanks for the details. We can work through this together.",
+)
 
 
 async def get_user_conversation(
@@ -36,6 +47,24 @@ async def get_user_conversation(
             detail="Conversation not found",
         )
     return conversation
+
+
+async def save_message(
+    conversation: Conversation,
+    role: str,
+    content: str,
+    db: AsyncSession,
+) -> MessageResponse:
+    message = Message(
+        conversation_id=conversation.id,
+        role=role,
+        content=content,
+    )
+    conversation.updated_at = datetime.now(UTC)
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+    return MessageResponse.model_validate(message)
 
 
 @router.get("", response_model=list[ConversationResponse])
@@ -170,12 +199,47 @@ async def list_messages(conversation_id: UUID) -> PlaceholderResponse:
 
 @router.post(
     "/{conversation_id}/messages",
-    response_model=PlaceholderResponse,
+    response_model=MessageResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_message(
     conversation_id: UUID,
-    message: MessageCreate,
-) -> PlaceholderResponse:
-    del conversation_id, message
-    return PlaceholderResponse()
+    payload: MessageCreate,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+) -> MessageResponse:
+    conversation = await get_user_conversation(
+        conversation_id,
+        current_user,
+        db,
+    )
+    return await save_message(
+        conversation,
+        payload.role.value,
+        payload.content,
+        db,
+    )
+
+
+@router.post(
+    "/{conversation_id}/messages/assistant-reply",
+    response_model=MessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_assistant_reply(
+    conversation_id: UUID,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+) -> MessageResponse:
+    conversation = await get_user_conversation(
+        conversation_id,
+        current_user,
+        db,
+    )
+    await asyncio.sleep(random.uniform(2.0, 3.0))
+    return await save_message(
+        conversation,
+        "assistant",
+        random.choice(ASSISTANT_RESPONSES),
+        db,
+    )
