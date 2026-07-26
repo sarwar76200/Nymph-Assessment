@@ -1,5 +1,7 @@
 from enum import Enum
-from pydantic import BaseModel, EmailStr, Field
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class PlaceholderResponse(BaseModel):
@@ -9,6 +11,20 @@ class PlaceholderResponse(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
+
+
+class UserResponse(BaseModel):
+    id: UUID
+    email: EmailStr
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
 
 
 class ConversationStatus(str, Enum):
