@@ -14,9 +14,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 
-import { authenticate, AuthMode, saveSession } from "@/lib/auth";
+import {
+  authenticate,
+  AuthMode,
+  getServerSessionToken,
+  getSessionToken,
+  saveSession,
+  subscribeToSession,
+} from "@/lib/auth";
 
 type AuthFormProps = {
   mode: AuthMode;
@@ -34,6 +41,17 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const token = useSyncExternalStore(
+    subscribeToSession,
+    getSessionToken,
+    getServerSessionToken,
+  );
+
+  useEffect(() => {
+    if (token) {
+      router.replace("/dashboard");
+    }
+  }, [router, token]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,6 +93,15 @@ export function AuthForm({ mode }: AuthFormProps) {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (token) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <LoaderCircle size={24} className="animate-spin text-indigo-600" />
+        <span className="sr-only">Redirecting to dashboard</span>
+      </main>
+    );
   }
 
   return (

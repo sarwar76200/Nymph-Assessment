@@ -23,6 +23,7 @@ type ValidationError = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const SESSION_EVENT = "auth-session-changed";
 
 function getErrorMessage(detail: unknown): string {
   if (typeof detail === "string") {
@@ -73,5 +74,29 @@ export async function authenticate(
 export function saveSession(session: AuthResponse): void {
   localStorage.setItem("access_token", session.access_token);
   localStorage.setItem("auth_user", JSON.stringify(session.user));
-  window.dispatchEvent(new Event("auth-session-changed"));
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
+
+export function clearSession(): void {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("auth_user");
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
+
+export function subscribeToSession(onStoreChange: () => void): () => void {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(SESSION_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(SESSION_EVENT, onStoreChange);
+  };
+}
+
+export function getSessionToken(): string | null | undefined {
+  return window.localStorage.getItem("access_token");
+}
+
+export function getServerSessionToken(): undefined {
+  return undefined;
 }
