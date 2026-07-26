@@ -33,7 +33,7 @@ created_at
 documents
 ---------
 id (UUID, PK)
-user_id (FK -> users.id)
+conversation_id (FK -> conversations.id)
 filename
 file_type
 file_size

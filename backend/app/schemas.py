@@ -1,6 +1,4 @@
 from enum import Enum
-from uuid import UUID
-
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -41,4 +39,3 @@ class DocumentMetadataCreate(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     file_type: str = Field(pattern=r"^(pdf|docx|txt)$")
     file_size: int = Field(gt=0)
-    conversation_id: UUID | None = None
