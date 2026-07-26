@@ -14,6 +14,7 @@ conversations
 id (UUID, PK)
 user_id (FK -> users.id)
 title
+status           -- active | completed
 created_at
 updated_at
 
