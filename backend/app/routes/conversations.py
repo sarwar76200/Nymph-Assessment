@@ -38,9 +38,25 @@ async def get_user_conversation(
     return conversation
 
 
-@router.get("", response_model=PlaceholderResponse)
-async def list_conversations() -> PlaceholderResponse:
-    return PlaceholderResponse()
+@router.get("", response_model=list[ConversationResponse])
+async def list_conversations(
+    db: DatabaseSession,
+    current_user: CurrentUser,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> list[ConversationResponse]:
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.user_id == current_user.id)
+        .order_by(Conversation.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    conversations = result.scalars().all()
+    return [
+        ConversationResponse.model_validate(conversation)
+        for conversation in conversations
+    ]
 
 
 @router.post(
