@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Query, Response, status
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import CurrentUser, DatabaseSession
@@ -48,7 +48,10 @@ async def list_conversations(
     result = await db.execute(
         select(Conversation)
         .where(Conversation.user_id == current_user.id)
-        .order_by(Conversation.updated_at.desc())
+        .order_by(
+            case((Conversation.status == "active", 0), else_=1),
+            Conversation.updated_at.desc(),
+        )
         .limit(limit)
         .offset(offset)
     )
@@ -139,11 +142,21 @@ async def update_conversation_status(
 
 @router.delete(
     "/{conversation_id}",
-    response_model=PlaceholderResponse,
+    status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_conversation(conversation_id: UUID) -> PlaceholderResponse:
-    del conversation_id
-    return PlaceholderResponse()
+async def delete_conversation(
+    conversation_id: UUID,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+) -> Response:
+    conversation = await get_user_conversation(
+        conversation_id,
+        current_user,
+        db,
+    )
+    await db.delete(conversation)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
