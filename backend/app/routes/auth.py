@@ -2,12 +2,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.database import get_db
 from app.models import User
-from app.schemas import LoginRequest, LoginResponse, UserResponse
+from app.schemas import (
+    LoginRequest,
+    LoginResponse,
+    SignUpRequest,
+    UserResponse,
+)
 from app.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -18,6 +24,41 @@ INVALID_CREDENTIALS = HTTPException(
     headers={"WWW-Authenticate": "Bearer"},
 )
 DUMMY_PASSWORD_HASH = hash_password("invalid-placeholder-password")
+
+
+@router.post(
+    "/signup",
+    response_model=LoginResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def signup(
+    credentials: SignUpRequest,
+    db: DatabaseSession,
+) -> LoginResponse:
+    user = User(
+        email=str(credentials.email).strip().lower(),
+        name=credentials.name,
+        password_hash=await run_in_threadpool(
+            hash_password,
+            credentials.password,
+        ),
+    )
+    db.add(user)
+
+    try:
+        await db.commit()
+        await db.refresh(user)
+    except IntegrityError as error:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists",
+        ) from error
+
+    return LoginResponse(
+        access_token=create_access_token(user.id),
+        user=UserResponse.model_validate(user),
+    )
 
 
 @router.post(
