@@ -221,11 +221,10 @@ export function MessageCountCard() {
         ) : (
           <p
             key={messageCountRevision}
-            className={`text-2xl font-bold tracking-tight ${
-              messageCountRevision > 0
+            className={`text-2xl font-bold tracking-tight ${messageCountRevision > 0
                 ? "animate-[slide-from-bottom_300ms_ease-out]"
                 : ""
-            }`}
+              }`}
           >
             {totalMessages}
           </p>
@@ -500,11 +499,12 @@ export function RecentConversations() {
             <p className="mt-1 text-xs text-slate-400">Start a conversation to see it here.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div>
             {recentConversations.map((conversation) => (
               <ConversationRow
                 key={conversation.id}
                 conversation={conversation}
+                isSelected={selectedConversation?.id === conversation.id}
                 isMenuOpen={openMenuId === conversation.id}
                 onOpen={() => {
                   setSelectedConversation(conversation);
@@ -573,6 +573,7 @@ export function RecentConversations() {
 
 type ConversationRowProps = {
   conversation: Conversation;
+  isSelected: boolean;
   isMenuOpen: boolean;
   onOpen: () => void;
   onToggleMenu: () => void;
@@ -582,6 +583,7 @@ type ConversationRowProps = {
 
 function ConversationRow({
   conversation,
+  isSelected,
   isMenuOpen,
   onOpen,
   onToggleMenu,
@@ -589,9 +591,15 @@ function ConversationRow({
   onDelete,
 }: ConversationRowProps) {
   return (
-    <div className="flex items-center transition hover:bg-slate-50/70">
+    <div
+      className={`flex items-center border-l-3 transition ${isSelected
+          ? "border-indigo-500 bg-indigo-50/80"
+          : "border-transparent hover:bg-slate-50/70"
+        }`}
+    >
       <button
         type="button"
+        aria-current={isSelected ? "true" : undefined}
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-start gap-3 py-4 pr-2 pl-5 text-left focus:outline-none md:items-center md:pl-6"
       >
@@ -604,11 +612,10 @@ function ConversationRow({
               {conversation.title}
             </h3>
             <span
-              className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize sm:inline ${
-                conversation.status === "active"
+              className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize sm:inline ${conversation.status === "active"
                   ? "bg-amber-50 text-amber-700"
                   : "bg-emerald-50 text-emerald-700"
-              }`}
+                }`}
             >
               {conversation.status}
             </span>
@@ -907,9 +914,8 @@ function ChatWindow({
       className="fixed right-4 bottom-4 z-50 w-[calc(100%-2rem)] max-w-md overflow-visible rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20 sm:right-6 sm:bottom-6"
     >
       <header
-        className={`flex items-center gap-3 px-4 ${
-          isMinimized ? "h-14" : "h-16 border-b border-slate-100"
-        }`}
+        className={`flex items-center gap-3 px-4 ${isMinimized ? "h-14" : "h-16 border-b border-slate-100"
+          }`}
       >
         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
           <Bot size={18} />
