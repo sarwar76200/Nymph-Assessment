@@ -136,7 +136,7 @@ function Dashboard() {
         <main className="mx-auto max-w-[1440px] px-5 py-7 md:px-8 md:py-9">
           <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
             <div>
-              <p className="mb-1 text-sm font-medium text-indigo-600">Sunday, July 26</p>
+              <p className="mb-1 text-sm font-medium text-indigo-600">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).replace(/^\w/, (c) => c.toUpperCase())}</p>
               <h1 className="text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
                 <DashboardUser variant="greeting" />
               </h1>
