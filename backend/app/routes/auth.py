@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.database import get_db
+from app.dependencies import CurrentUser
 from app.models import User
 from app.schemas import (
     LoginRequest,
@@ -24,6 +25,11 @@ INVALID_CREDENTIALS = HTTPException(
     headers={"WWW-Authenticate": "Bearer"},
 )
 DUMMY_PASSWORD_HASH = hash_password("invalid-placeholder-password")
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user(current_user: CurrentUser) -> UserResponse:
+    return UserResponse.model_validate(current_user)
 
 
 @router.post(

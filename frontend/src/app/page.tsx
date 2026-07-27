@@ -20,9 +20,12 @@ import {
   DocumentCountCard,
   DocumentProvider,
   RecentDocuments,
-  UploadDocumentButton,
 } from "@/components/dashboard-documents";
-import { DashboardUser } from "@/components/dashboard-user";
+import { AuthGuard } from "@/components/auth-guard";
+import {
+  DashboardUser,
+  UserInformationCard,
+} from "@/components/dashboard-user";
 import { ConversationSearch } from "@/components/conversation-search";
 
 const navItems = [
@@ -33,11 +36,13 @@ const navItems = [
 
 export default function Home() {
   return (
-    <ConversationProvider>
-      <DocumentProvider>
-        <Dashboard />
-      </DocumentProvider>
-    </ConversationProvider>
+    <AuthGuard>
+      <ConversationProvider>
+        <DocumentProvider>
+          <Dashboard />
+        </DocumentProvider>
+      </ConversationProvider>
+    </AuthGuard>
   );
 }
 
@@ -149,20 +154,7 @@ function Dashboard() {
 
             <div className="space-y-6">
               <RecentDocuments />
-
-              <div className="relative overflow-hidden rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
-                <div className="absolute -top-10 -right-8 size-36 rounded-full bg-indigo-500/20 blur-2xl" />
-                <div className="relative">
-                  <div className="mb-4 flex size-9 items-center justify-center rounded-lg bg-white/10">
-                    <Sparkles size={17} className="text-indigo-300" />
-                  </div>
-                  <h2 className="text-sm font-semibold">Get better answers from your AI agents</h2>
-                  <p className="mt-1.5 max-w-sm text-xs leading-5 text-slate-400">
-                    Add relevant documents so your support agents can give you more useful answers.
-                  </p>
-                  <UploadDocumentButton />
-                </div>
-              </div>
+              <UserInformationCard />
             </div>
           </section>
         </main>

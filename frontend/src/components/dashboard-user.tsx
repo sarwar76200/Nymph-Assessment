@@ -1,11 +1,21 @@
 "use client";
 
-import { CircleHelp, LogOut, MoreHorizontal, Settings } from "lucide-react";
+import {
+  CalendarDays,
+  CircleHelp,
+  LogOut,
+  Mail,
+  MoreHorizontal,
+  Settings,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import {
+  API_URL,
   clearSession,
+  getSessionToken,
+  saveUser,
   subscribeToSession,
   type AuthUser,
 } from "@/lib/auth";
@@ -124,4 +134,92 @@ export function DashboardUser({ variant }: DashboardUserProps) {
       )}
     </div>
   );
+}
+
+export function UserInformationCard() {
+  const storedUser = useSyncExternalStore(
+    subscribeToSession,
+    getSnapshot,
+    getServerSnapshot,
+  );
+  const user = parseUser(storedUser);
+  const initials = getInitials(user?.name ?? "User") || "U";
+
+  useEffect(() => {
+    if (user?.created_at) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      const token = getSessionToken();
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/v1/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.status === 401) {
+          clearSession();
+          return;
+        }
+
+        if (response.ok) {
+          saveUser((await response.json()) as AuthUser);
+        }
+      } catch {
+        // Existing profile data remains visible if refreshing it fails.
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [user?.created_at]);
+
+  return (
+    <section className="relative overflow-hidden rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
+      <div className="absolute -top-10 -right-8 size-36 rounded-full bg-indigo-500/20 blur-2xl" />
+      <div className="relative">
+        <div className="flex items-center gap-3.5">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 text-sm font-bold text-white ring-2 ring-white/10">
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">
+              {user?.name ?? "User"}
+            </p>
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-slate-400">
+              <Mail size={12} className="shrink-0" />
+              <span className="truncate">{user?.email ?? "Unavailable"}</span>
+            </div>
+          </div>
+          <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold text-emerald-300">
+            Active
+          </span>
+        </div>
+
+        <div className="mt-4 flex justify-end items-center gap-2 border-t border-white/10 pt-3 text-xs text-slate-400">
+          <CalendarDays size={13} className="shrink-0" />
+          <span>Joined</span>
+          <span className="ml-auto font-medium text-slate-200">
+            {user?.created_at
+              ? formatJoinedDate(user.created_at)
+              : "Loading..."}
+          </span>
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+function formatJoinedDate(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
 }

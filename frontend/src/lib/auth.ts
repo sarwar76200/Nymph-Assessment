@@ -4,6 +4,7 @@ export type AuthUser = {
   id: string;
   email: string;
   name: string;
+  created_at?: string;
 };
 
 export type AuthResponse = {
@@ -74,7 +75,11 @@ export async function authenticate(
 
 export function saveSession(session: AuthResponse): void {
   localStorage.setItem("access_token", session.access_token);
-  localStorage.setItem("auth_user", JSON.stringify(session.user));
+  saveUser(session.user);
+}
+
+export function saveUser(user: AuthUser): void {
+  localStorage.setItem("auth_user", JSON.stringify(user));
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
