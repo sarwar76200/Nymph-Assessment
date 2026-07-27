@@ -113,6 +113,10 @@ class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MessageCountResponse(BaseModel):
+    total_messages: int
+
+
 class DocumentMetadataCreate(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     file_type: str = Field(pattern=r"^(pdf|docx|txt)$")

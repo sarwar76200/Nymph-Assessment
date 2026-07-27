@@ -42,6 +42,10 @@ type ConversationContextValue = {
   isLoading: boolean;
   error: string;
   reload: () => void;
+  touchConversation: (conversationId: string, updatedAt: string) => void;
+  totalMessages: number | null;
+  messageCountRevision: number;
+  incrementMessageCount: (amount: number) => void;
 };
 
 const ConversationContext = createContext<ConversationContextValue | null>(null);
@@ -50,6 +54,8 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [totalMessages, setTotalMessages] = useState<number | null>(null);
+  const [messageCountRevision, setMessageCountRevision] = useState(0);
 
   const loadConversations = useCallback(async () => {
     const token = getSessionToken();
@@ -90,13 +96,67 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loadMessageCount = useCallback(async () => {
+    const token = getSessionToken();
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/dashboard/messages/count`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (response.status === 401) {
+        clearSession();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Unable to load the message count.");
+      }
+
+      const data = (await response.json()) as { total_messages: number };
+      setTotalMessages(data.total_messages);
+    } catch {
+      setTotalMessages(null);
+    }
+  }, []);
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadConversations();
+      void loadMessageCount();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [loadConversations]);
+  }, [loadConversations, loadMessageCount]);
+
+  const touchConversation = useCallback((conversationId: string, updatedAt: string) => {
+    setConversations((currentConversations) =>
+      currentConversations.map((conversation) =>
+        conversation.id === conversationId
+          ? { ...conversation, updated_at: updatedAt }
+          : conversation,
+      ),
+    );
+  }, []);
+
+  const incrementMessageCount = useCallback((amount: number) => {
+    if (totalMessages === null) {
+      return;
+    }
+
+    setTotalMessages((currentTotal) =>
+      currentTotal === null ? currentTotal : currentTotal + amount,
+    );
+    setMessageCountRevision((currentRevision) => currentRevision + 1);
+  }, [totalMessages]);
 
   return (
     <ConversationContext.Provider
@@ -105,6 +165,10 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
         isLoading,
         error,
         reload: loadConversations,
+        touchConversation,
+        totalMessages,
+        messageCountRevision,
+        incrementMessageCount,
       }}
     >
       {children}
@@ -136,6 +200,39 @@ export function ConversationCountCard() {
       </p>
       <p className="mt-1 text-xs font-medium text-slate-500">Total conversations</p>
       <p className="mt-3 text-[11px] text-slate-400">Your saved AI chats</p>
+    </article>
+  );
+}
+
+export function MessageCountCard() {
+  const { totalMessages, messageCountRevision } = useConversations();
+
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/40">
+      <div className="flex items-start justify-between">
+        <div className="flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+          <Bot size={19} />
+        </div>
+        <MoreHorizontal size={17} className="text-slate-300" />
+      </div>
+      <div className="mt-5 h-7 overflow-hidden">
+        {totalMessages === null ? (
+          <span className="inline-block h-7 w-12 animate-pulse rounded bg-slate-100" />
+        ) : (
+          <p
+            key={messageCountRevision}
+            className={`text-2xl font-bold tracking-tight ${
+              messageCountRevision > 0
+                ? "animate-[slide-from-bottom_300ms_ease-out]"
+                : ""
+            }`}
+          >
+            {totalMessages}
+          </p>
+        )}
+      </div>
+      <p className="mt-1 text-xs font-medium text-slate-500">Messages exchanged</p>
+      <p className="mt-3 text-[11px] text-slate-400">User and assistant messages</p>
     </article>
   );
 }
@@ -231,7 +328,14 @@ export function StartConversationButton() {
 }
 
 export function RecentConversations() {
-  const { conversations, isLoading, error, reload } = useConversations();
+  const {
+    conversations,
+    isLoading,
+    error,
+    reload,
+    touchConversation,
+    incrementMessageCount,
+  } = useConversations();
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -424,6 +528,10 @@ export function RecentConversations() {
           conversation={selectedConversation}
           onDismiss={() => setSelectedConversation(null)}
           onStatusChanged={reload}
+          onMessageCreated={(conversationId, updatedAt) => {
+            touchConversation(conversationId, updatedAt);
+            incrementMessageCount(2);
+          }}
         />
       )}
 
@@ -733,12 +841,14 @@ type ChatWindowProps = {
   conversation: Conversation;
   onDismiss: () => void;
   onStatusChanged: () => void;
+  onMessageCreated: (conversationId: string, updatedAt: string) => void;
 };
 
 function ChatWindow({
   conversation,
   onDismiss,
   onStatusChanged,
+  onMessageCreated,
 }: ChatWindowProps) {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -850,12 +960,14 @@ function ChatWindow({
       </header>
 
       {!isMinimized && (
-        <div className="flex h-96 flex-col">
+        <div className="flex h-[40rem] max-h-[calc(100vh-8rem)] flex-col">
           <ConversationMessages
             key={conversation.id}
             conversationId={conversation.id}
             conversationStatus={conversation.status}
-            onMessageCreated={onStatusChanged}
+            onMessageCreated={(updatedAt) =>
+              onMessageCreated(conversation.id, updatedAt)
+            }
           />
           {closeError && (
             <div className="border-t border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">

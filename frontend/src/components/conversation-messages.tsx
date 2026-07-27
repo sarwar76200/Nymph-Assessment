@@ -24,7 +24,7 @@ type Message = {
 type ConversationMessagesProps = {
   conversationId: string;
   conversationStatus: "active" | "completed";
-  onMessageCreated: () => void;
+  onMessageCreated: (updatedAt: string) => void;
 };
 
 export function ConversationMessages({
@@ -158,7 +158,9 @@ export function ConversationMessages({
       const decoder = new TextDecoder();
       let buffer = "";
       let receivedDoneEvent = false;
-      let finalAssistantMessage: Message | null = null;
+      const streamState: { finalAssistantMessage: Message | null } = {
+        finalAssistantMessage: null,
+      };
       let typingQueue = Promise.resolve();
 
       const typeAssistantChunk = async (chunk: string) => {
@@ -222,7 +224,7 @@ export function ConversationMessages({
         }
 
         if (parsedEvent.event === "assistant_message") {
-          finalAssistantMessage = parsedEvent.data as Message;
+          streamState.finalAssistantMessage = parsedEvent.data as Message;
           return;
         }
 
@@ -255,11 +257,11 @@ export function ConversationMessages({
         throw new Error("The assistant response ended unexpectedly.");
       }
 
-      if (!finalAssistantMessage) {
+      if (!streamState.finalAssistantMessage) {
         throw new Error("The assistant response was not saved.");
       }
 
-      const savedAssistantMessage = finalAssistantMessage;
+      const savedAssistantMessage = streamState.finalAssistantMessage;
       setMessages((currentMessages) => {
         const hasStreamingMessage = currentMessages.some(
           (message) => message.id === streamingAssistantId,
@@ -274,7 +276,7 @@ export function ConversationMessages({
           : [...currentMessages, savedAssistantMessage];
       });
 
-      onMessageCreated();
+      onMessageCreated(savedAssistantMessage.created_at);
     } catch (requestError) {
       setMessages((currentMessages) =>
         currentMessages.map((message) =>

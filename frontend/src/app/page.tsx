@@ -1,6 +1,5 @@
 import {
   Bell,
-  Bot,
   CircleHelp,
   FileText,
   FolderOpen,
@@ -16,6 +15,7 @@ import {
 import {
   ConversationCountCard,
   ConversationProvider,
+  MessageCountCard,
   RecentConversations,
   StartConversationButton,
 } from "@/components/dashboard-conversations";
@@ -141,13 +141,7 @@ function Dashboard() {
 
           <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <ConversationCountCard />
-            <StatCard
-              icon={Bot}
-              label="Messages exchanged"
-              value="148"
-              note="+18 this week"
-              iconClass="bg-amber-50 text-amber-600"
-            />
+            <MessageCountCard />
             <StatCard
               icon={FileText}
               label="Documents"
