@@ -28,7 +28,7 @@ import {
 import { ConversationMessages } from "@/components/conversation-messages";
 import { API_URL, clearSession, getSessionToken } from "@/lib/auth";
 
-type Conversation = {
+export type Conversation = {
   id: string;
   user_id: string;
   title: string;
@@ -176,7 +176,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function useConversations() {
+export function useConversations() {
   const context = useContext(ConversationContext);
   if (!context) {
     throw new Error("Conversation components require ConversationProvider.");

@@ -1,12 +1,10 @@
 import {
   Bell,
   CircleHelp,
-  FileText,
   FolderOpen,
   LayoutDashboard,
   MessageSquareText,
   MoreHorizontal,
-  Plus,
   Search,
   Settings,
   Sparkles,
@@ -19,13 +17,13 @@ import {
   RecentConversations,
   StartConversationButton,
 } from "@/components/dashboard-conversations";
+import {
+  DocumentCountCard,
+  DocumentProvider,
+  RecentDocuments,
+  UploadDocumentButton,
+} from "@/components/dashboard-documents";
 import { DashboardUser } from "@/components/dashboard-user";
-
-const documents = [
-  { name: "Product Guide.pdf", size: "2.4 MB", date: "Jul 24", type: "PDF" },
-  { name: "Support FAQ.docx", size: "860 KB", date: "Jul 22", type: "DOCX" },
-  { name: "Refund Policy.txt", size: "24 KB", date: "Jul 18", type: "TXT" },
-];
 
 const navItems = [
   { label: "Overview", icon: LayoutDashboard, active: true },
@@ -36,7 +34,9 @@ const navItems = [
 export default function Home() {
   return (
     <ConversationProvider>
-      <Dashboard />
+      <DocumentProvider>
+        <Dashboard />
+      </DocumentProvider>
     </ConversationProvider>
   );
 }
@@ -142,13 +142,7 @@ function Dashboard() {
           <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <ConversationCountCard />
             <MessageCountCard />
-            <StatCard
-              icon={FileText}
-              label="Documents"
-              value="12"
-              note="+3 this month"
-              iconClass="bg-emerald-50 text-emerald-600"
-            />
+            <DocumentCountCard />
             <StatCard
               icon={Sparkles}
               label="AI agents available"
@@ -162,36 +156,7 @@ function Dashboard() {
             <RecentConversations />
 
             <div className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/40">
-                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                  <div>
-                    <h2 className="font-semibold">Recent documents</h2>
-                    <p className="mt-0.5 text-xs text-slate-400">Knowledge added recently</p>
-                  </div>
-                  <button
-                    aria-label="Add document"
-                    className="flex size-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-                <div className="divide-y divide-slate-100 px-5">
-                  {documents.map((document) => (
-                    <article key={document.name} className="flex items-center gap-3 py-3.5">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-                        <FileText size={17} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-sm font-medium text-slate-700">{document.name}</h3>
-                        <p className="mt-0.5 text-[11px] text-slate-400">
-                          {document.type} · {document.size}
-                        </p>
-                      </div>
-                      <time className="text-[11px] text-slate-400">{document.date}</time>
-                    </article>
-                  ))}
-                </div>
-              </div>
+              <RecentDocuments />
 
               <div className="relative overflow-hidden rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
                 <div className="absolute -top-10 -right-8 size-36 rounded-full bg-indigo-500/20 blur-2xl" />
@@ -203,9 +168,7 @@ function Dashboard() {
                   <p className="mt-1.5 max-w-sm text-xs leading-5 text-slate-400">
                     Add relevant documents so your support agents can give you more useful answers.
                   </p>
-                  <button className="mt-4 text-xs font-semibold text-indigo-300 hover:text-indigo-200">
-                    Upload a document →
-                  </button>
+                  <UploadDocumentButton />
                 </div>
               </div>
             </div>

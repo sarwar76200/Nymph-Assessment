@@ -1,10 +1,19 @@
 "use client";
 
-import { AlertCircle, LoaderCircle, MessageSquareText, Send } from "lucide-react";
 import {
+  AlertCircle,
+  FileText,
+  LoaderCircle,
+  MessageSquareText,
+  Paperclip,
+  Send,
+} from "lucide-react";
+import {
+  ChangeEvent,
   FormEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -21,6 +30,19 @@ type Message = {
   failed?: boolean;
 };
 
+type ThreadDocument = {
+  id: string;
+  conversation_id: string;
+  filename: string;
+  file_type: string;
+  file_size: number;
+  uploaded_at: string;
+};
+
+type TimelineItem =
+  | { type: "message"; timestamp: string; message: Message }
+  | { type: "document"; timestamp: string; document: ThreadDocument };
+
 type ConversationMessagesProps = {
   conversationId: string;
   conversationStatus: "active" | "completed";
@@ -33,12 +55,17 @@ export function ConversationMessages({
   onMessageCreated,
 }: ConversationMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [documents, setDocuments] = useState<ThreadDocument[]>([]);
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [hasAssistantStarted, setHasAssistantStarted] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const threadScrollRef = useRef<HTMLDivElement>(null);
+  const hasPositionedInitialThread = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMessages = useCallback(async () => {
     const token = getSessionToken();
@@ -85,17 +112,71 @@ export function ConversationMessages({
     }
   }, [conversationId]);
 
+  const loadDocuments = useCallback(async () => {
+    const token = getSessionToken();
+    if (!token) {
+      clearSession();
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/v1/documents?limit=100`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        clearSession();
+        return;
+      }
+
+      if (!response.ok) {
+        return;
+      }
+
+      const allDocuments = (await response.json()) as ThreadDocument[];
+      setDocuments(
+        allDocuments.filter(
+          (document) => document.conversation_id === conversationId,
+        ),
+      );
+    } catch {
+      // Messages remain usable if document metadata cannot be loaded.
+    }
+  }, [conversationId]);
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadMessages();
+      void loadDocuments();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [loadMessages]);
+  }, [loadDocuments, loadMessages]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isSending]);
+    const handleDocumentCreated = (event: Event) => {
+      const createdDocument = (event as CustomEvent<ThreadDocument>).detail;
+      if (
+        !createdDocument ||
+        createdDocument.conversation_id !== conversationId
+      ) {
+        return;
+      }
+
+      setDocuments((currentDocuments) => [
+        ...currentDocuments.filter(
+          (document) => document.id !== createdDocument.id,
+        ),
+        createdDocument,
+      ]);
+    };
+
+    window.addEventListener("document-created", handleDocumentCreated);
+    return () =>
+      window.removeEventListener("document-created", handleDocumentCreated);
+  }, [conversationId]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -298,12 +379,140 @@ export function ConversationMessages({
     }
   }
 
+  async function handleDocumentSelected(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    const fileType = getDocumentFileType(file.name);
+    if (!fileType) {
+      setError("Choose a PDF, DOCX, or TXT file.");
+      return;
+    }
+
+    if (file.size <= 0) {
+      setError("The selected file is empty.");
+      return;
+    }
+
+    const token = getSessionToken();
+    if (!token) {
+      clearSession();
+      return;
+    }
+
+    setIsUploadingDocument(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/conversations/${conversationId}/documents`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            filename: file.name,
+            file_type: fileType,
+            file_size: file.size,
+          }),
+        },
+      );
+
+      if (response.status === 401) {
+        clearSession();
+        return;
+      }
+
+      if (response.status === 404) {
+        throw new Error("This conversation is no longer available.");
+      }
+
+      if (!response.ok) {
+        throw new Error("Unable to add the document.");
+      }
+
+      const createdDocument = (await response.json()) as ThreadDocument;
+      window.dispatchEvent(
+        new CustomEvent("document-created", {
+          detail: createdDocument,
+        }),
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to add the document.",
+      );
+    } finally {
+      setIsUploadingDocument(false);
+    }
+  }
+
+  const timelineItems: TimelineItem[] = [
+    ...messages.map(
+      (message): TimelineItem => ({
+        type: "message",
+        timestamp: message.created_at,
+        message,
+      }),
+    ),
+    ...documents.map(
+      (document): TimelineItem => ({
+        type: "document",
+        timestamp: document.uploaded_at,
+        document,
+      }),
+    ),
+  ].sort(
+    (firstItem, secondItem) =>
+      new Date(firstItem.timestamp).getTime() -
+      new Date(secondItem.timestamp).getTime(),
+  );
+
+  useLayoutEffect(() => {
+    const scrollContainer = threadScrollRef.current;
+    if (
+      isLoading ||
+      hasPositionedInitialThread.current ||
+      timelineItems.length === 0 ||
+      !scrollContainer
+    ) {
+      return;
+    }
+
+    const bottom = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    scrollContainer.scrollTop = Math.max(0, bottom - 220);
+    hasPositionedInitialThread.current = true;
+  }, [isLoading, timelineItems.length]);
+
+  useEffect(() => {
+    if (!hasPositionedInitialThread.current || isLoading) {
+      return;
+    }
+
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [documents, isLoading, isSending, messages]);
+
   return (
     <>
-      <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 px-4 py-4">
+      <div
+        ref={threadScrollRef}
+        className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 px-4 py-4"
+      >
         {isLoading ? (
           <MessageSkeleton />
-        ) : error && messages.length === 0 ? (
+        ) : error && timelineItems.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <AlertCircle size={22} className="text-red-400" />
             <p className="mt-2 text-xs text-slate-500">{error}</p>
@@ -315,7 +524,7 @@ export function ConversationMessages({
               Try again
             </button>
           </div>
-        ) : messages.length === 0 ? (
+        ) : timelineItems.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <div className="flex size-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
               <MessageSquareText size={18} />
@@ -325,16 +534,26 @@ export function ConversationMessages({
           </div>
         ) : (
           <div className="space-y-3">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
+            {timelineItems.map((item) =>
+              item.type === "message" ? (
+                <MessageBubble
+                  key={`message-${item.message.id}`}
+                  message={item.message}
+                />
+              ) : (
+                <DocumentTimelineItem
+                  key={`document-${item.document.id}`}
+                  document={item.document}
+                />
+              ),
+            )}
             {isSending && !hasAssistantStarted && <TypingIndicator />}
             <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
-      {error && messages.length > 0 && (
+      {error && timelineItems.length > 0 && (
         <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
           {error}
         </div>
@@ -362,6 +581,26 @@ export function ConversationMessages({
               placeholder="Type your message..."
               className="max-h-24 min-h-8 flex-1 resize-none py-1.5 text-sm leading-5 text-slate-800 outline-none placeholder:text-slate-400"
             />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              onChange={handleDocumentSelected}
+              className="sr-only"
+            />
+            <button
+              type="button"
+              aria-label="Add document"
+              disabled={isUploadingDocument || isSending}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isUploadingDocument ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <Paperclip size={17} />
+              )}
+            </button>
             <button
               type="submit"
               aria-label="Send message"
@@ -421,6 +660,27 @@ function MessageBubble({ message }: { message: Message }) {
   );
 }
 
+function DocumentTimelineItem({ document }: { document: ThreadDocument }) {
+  return (
+    <div className="flex justify-end py-1">
+      <div className="flex max-w-[85%] items-center gap-2.5 rounded-2xl rounded-br-md border border-indigo-100 bg-indigo-50 px-3 py-2 shadow-sm">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600">
+          <FileText size={15} />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-slate-700">
+            {document.filename}
+          </p>
+          <p className="mt-0.5 text-[10px] text-slate-500">
+            {document.file_type.toUpperCase()} · {formatFileSize(document.file_size)} ·{" "}
+            {formatTimelineDate(document.uploaded_at)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TypingIndicator() {
   return (
     <div className="flex justify-start" aria-label="Assistant is typing">
@@ -452,6 +712,34 @@ function formatMessageTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatTimelineDate(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function getDocumentFileType(
+  filename: string,
+): "pdf" | "docx" | "txt" | null {
+  const extension = filename.split(".").pop()?.toLowerCase();
+  return extension === "pdf" || extension === "docx" || extension === "txt"
+    ? extension
+    : null;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function parseSseEvent(
