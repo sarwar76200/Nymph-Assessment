@@ -1,9 +1,11 @@
 import asyncio
-import random
+import json
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,12 +22,18 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
-ASSISTANT_RESPONSES = (
-    "Thanks for reaching out. I am happy to help with that.",
-    "I understand your concern. Let me look into this for you.",
-    "I have reviewed your message and will guide you through the next steps.",
-    "That is a good question. Here is what I recommend.",
-    "Thanks for the details. We can work through this together.",
+LOREM_PHRASES = (
+    "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod",
+    "tempor incididunt ut labore et dolore magna aliqua Ut enim ad minim",
+    "veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea",
+    "commodo consequat Duis aute irure dolor in reprehenderit in voluptate",
+    "velit esse cillum dolore eu fugiat nulla pariatur Excepteur sint occaecat",
+    "cupidatat non proident sunt in culpa qui officia deserunt mollit anim id",
+    "est laborum",
+)
+LOREM_WORDS = " ".join(LOREM_PHRASES).split()
+ASSISTANT_RESPONSE = " ".join(
+    (LOREM_WORDS * ((50 // len(LOREM_WORDS)) + 1))[:50]
 )
 
 
@@ -65,6 +73,35 @@ async def save_message(
     await db.commit()
     await db.refresh(message)
     return MessageResponse.model_validate(message)
+
+
+def format_sse_event(event: str, data: dict[str, object]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+async def stream_chat_response(
+    user_message: MessageResponse,
+    assistant_message: MessageResponse,
+) -> AsyncIterator[str]:
+    yield format_sse_event(
+        "user_message",
+        user_message.model_dump(mode="json"),
+    )
+
+    words = assistant_message.content.split()
+    chunk_size = 5
+    for index in range(0, len(words), chunk_size):
+        chunk = " ".join(words[index : index + chunk_size])
+        if index + chunk_size < len(words):
+            chunk += " "
+        yield format_sse_event("assistant_chunk", {"content": chunk})
+        await asyncio.sleep(0.2)
+
+    yield format_sse_event(
+        "assistant_message",
+        assistant_message.model_dump(mode="json"),
+    )
+    yield format_sse_event("done", {})
 
 
 @router.get("", response_model=list[ConversationResponse])
@@ -190,56 +227,66 @@ async def delete_conversation(
 
 @router.get(
     "/{conversation_id}/messages",
-    response_model=PlaceholderResponse,
+    response_model=list[MessageResponse],
 )
-async def list_messages(conversation_id: UUID) -> PlaceholderResponse:
-    del conversation_id
-    return PlaceholderResponse()
+async def list_messages(
+    conversation_id: UUID,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[MessageResponse]:
+    conversation = await get_user_conversation(
+        conversation_id,
+        current_user,
+        db,
+    )
+    result = await db.execute(
+        select(Message)
+        .where(Message.conversation_id == conversation.id)
+        .order_by(Message.created_at.asc())
+        .limit(limit)
+        .offset(offset)
+    )
+    messages = result.scalars().all()
+    return [
+        MessageResponse.model_validate(message)
+        for message in messages
+    ]
 
 
 @router.post(
     "/{conversation_id}/messages",
-    response_model=MessageResponse,
-    status_code=status.HTTP_201_CREATED,
+    response_class=StreamingResponse,
 )
 async def create_message(
     conversation_id: UUID,
     payload: MessageCreate,
     db: DatabaseSession,
     current_user: CurrentUser,
-) -> MessageResponse:
+) -> StreamingResponse:
     conversation = await get_user_conversation(
         conversation_id,
         current_user,
         db,
     )
-    return await save_message(
+    user_message = await save_message(
         conversation,
-        payload.role.value,
+        "user",
         payload.content,
         db,
     )
-
-
-@router.post(
-    "/{conversation_id}/messages/assistant-reply",
-    response_model=MessageResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_assistant_reply(
-    conversation_id: UUID,
-    db: DatabaseSession,
-    current_user: CurrentUser,
-) -> MessageResponse:
-    conversation = await get_user_conversation(
-        conversation_id,
-        current_user,
-        db,
-    )
-    await asyncio.sleep(random.uniform(2.0, 3.0))
-    return await save_message(
+    assistant_message = await save_message(
         conversation,
         "assistant",
-        random.choice(ASSISTANT_RESPONSES),
+        ASSISTANT_RESPONSE,
         db,
+    )
+    return StreamingResponse(
+        stream_chat_response(user_message, assistant_message),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )

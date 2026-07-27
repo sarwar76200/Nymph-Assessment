@@ -92,7 +92,6 @@ class MessageRole(str, Enum):
 
 
 class MessageCreate(BaseModel):
-    role: MessageRole
     content: str = Field(min_length=1)
 
     @field_validator("content")

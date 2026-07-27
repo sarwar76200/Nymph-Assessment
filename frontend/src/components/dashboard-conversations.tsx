@@ -25,6 +25,7 @@ import {
   useState,
 } from "react";
 
+import { ConversationMessages } from "@/components/conversation-messages";
 import { API_URL, clearSession, getSessionToken } from "@/lib/auth";
 
 type Conversation = {
@@ -849,18 +850,13 @@ function ChatWindow({
       </header>
 
       {!isMinimized && (
-        <div className="flex h-80 flex-col">
-          <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-            <div className="flex size-11 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-              <MessageSquareText size={20} />
-            </div>
-            <p className="mt-3 text-sm font-semibold text-slate-700">
-              Continue your conversation
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              Chat messages will appear here.
-            </p>
-          </div>
+        <div className="flex h-96 flex-col">
+          <ConversationMessages
+            key={conversation.id}
+            conversationId={conversation.id}
+            conversationStatus={conversation.status}
+            onMessageCreated={onStatusChanged}
+          />
           {closeError && (
             <div className="border-t border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">
               {closeError}
