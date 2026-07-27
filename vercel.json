@@ -9,15 +9,15 @@
         }
     },
     "rewrites": [
-        {
-            "source": "/api/backend(/.*)?",
+        {   
+            "source": "/backend/(.*)",
             "destination": {
                 "type": "service",
                 "service": "backend"
             }
         },
         {
-            "source": "/(.*)",
+            "source": "/frontend/(.*)",
             "destination": {
                 "type": "service",
                 "service": "frontend"
