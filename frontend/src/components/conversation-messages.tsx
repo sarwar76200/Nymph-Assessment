@@ -40,6 +40,7 @@ type Message = {
 type ThreadDocument = {
   id: string;
   conversation_id: string;
+  uploaded_by_user_id: string | null;
   filename: string;
   file_type: string;
   file_size: number;
@@ -69,6 +70,9 @@ export function ConversationMessages({
   const [messages, setMessages] = useState<Message[]>([]);
   const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
   const [documents, setDocuments] = useState<ThreadDocument[]>([]);
+  const [uploaderNames, setUploaderNames] = useState<Record<string, string>>(
+    {},
+  );
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -237,6 +241,105 @@ export function ConversationMessages({
     loadMessageAuthors,
   ]);
 
+  const loadDocumentUploaders = useCallback(
+    async (loadedDocuments: ThreadDocument[], token: string) => {
+      if (!activeOrganizationId) {
+        return;
+      }
+
+      const currentUser = getSessionUser();
+      const documentsByUploader = new Map<string, string>();
+      const immediateNames: Record<string, string> = {};
+
+      loadedDocuments.forEach((document) => {
+        if (!document.uploaded_by_user_id) {
+          return;
+        }
+
+        if (document.uploaded_by_user_id === currentUser?.id) {
+          immediateNames[document.uploaded_by_user_id] = "You";
+          return;
+        }
+
+        if (!documentsByUploader.has(document.uploaded_by_user_id)) {
+          documentsByUploader.set(
+            document.uploaded_by_user_id,
+            document.id,
+          );
+        }
+      });
+
+      if (Object.keys(immediateNames).length > 0) {
+        setUploaderNames((currentNames) => ({
+          ...currentNames,
+          ...immediateNames,
+        }));
+      }
+
+      const results = await Promise.all(
+        Array.from(documentsByUploader.entries()).map(
+          async ([uploaderUserId, documentId]) => {
+            try {
+              const response = await fetch(
+                organizationApiUrl(
+                  activeOrganizationId,
+                  `/documents/${documentId}/uploader`,
+                ),
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                },
+              );
+
+              if (response.status === 401) {
+                clearSession();
+                return null;
+              }
+
+              if (response.status === 403) {
+                return "forbidden" as const;
+              }
+
+              if (!response.ok) {
+                return { uploaderUserId, name: "Unknown user" };
+              }
+
+              const uploader = (await response.json()) as {
+                id: string;
+                name: string;
+              };
+              return { uploaderUserId: uploader.id, name: uploader.name };
+            } catch {
+              return { uploaderUserId, name: "Unknown user" };
+            }
+          },
+        ),
+      );
+
+      if (results.some((result) => result === "forbidden")) {
+        await handleOrganizationForbidden();
+        return;
+      }
+
+      const loadedNames = results.reduce<Record<string, string>>(
+        (names, result) => {
+          if (result && result !== "forbidden") {
+            names[result.uploaderUserId] = result.name;
+          }
+          return names;
+        },
+        {},
+      );
+
+      setUploaderNames((currentNames) => ({
+        ...currentNames,
+        ...loadedNames,
+      }));
+    },
+    [activeOrganizationId, handleOrganizationForbidden],
+  );
+
   const loadDocuments = useCallback(async () => {
     const token = getSessionToken();
     if (!token || !activeOrganizationId) {
@@ -269,11 +372,11 @@ export function ConversationMessages({
       }
 
       const allDocuments = (await response.json()) as ThreadDocument[];
-      setDocuments(
-        allDocuments.filter(
-          (document) => document.conversation_id === conversationId,
-        ),
+      const conversationDocuments = allDocuments.filter(
+        (document) => document.conversation_id === conversationId,
       );
+      setDocuments(conversationDocuments);
+      void loadDocumentUploaders(conversationDocuments, token);
     } catch {
       // Messages remain usable if document metadata cannot be loaded.
     }
@@ -281,6 +384,7 @@ export function ConversationMessages({
     activeOrganizationId,
     conversationId,
     handleOrganizationForbidden,
+    loadDocumentUploaders,
   ]);
 
   useEffect(() => {
@@ -728,6 +832,13 @@ export function ConversationMessages({
                 <DocumentTimelineItem
                   key={`document-${item.document.id}`}
                   document={item.document}
+                  uploaderName={
+                    item.document.uploaded_by_user_id === currentUserId
+                      ? "You"
+                      : item.document.uploaded_by_user_id
+                        ? uploaderNames[item.document.uploaded_by_user_id]
+                        : undefined
+                  }
                 />
               ),
             )}
@@ -861,7 +972,17 @@ function MessageBubble({
   );
 }
 
-function DocumentTimelineItem({ document }: { document: ThreadDocument }) {
+function DocumentTimelineItem({
+  document,
+  uploaderName,
+}: {
+  document: ThreadDocument;
+  uploaderName?: string;
+}) {
+  const displayedUploader =
+    uploaderName ??
+    (document.uploaded_by_user_id ? "Member" : "Unknown user");
+
   return (
     <div className="flex justify-end py-1">
       <div className="flex max-w-[85%] items-center gap-2.5 rounded-2xl rounded-br-md border border-indigo-100 bg-indigo-50 px-3 py-2 shadow-sm">
@@ -873,7 +994,8 @@ function DocumentTimelineItem({ document }: { document: ThreadDocument }) {
             {document.filename}
           </p>
           <p className="mt-0.5 text-[10px] text-slate-500">
-            {document.file_type.toUpperCase()} · {formatFileSize(document.file_size)} ·{" "}
+            {document.file_type.toUpperCase()} ·{" "}
+            {formatFileSize(document.file_size)} · {displayedUploader} ·{" "}
             {formatTimelineDate(document.uploaded_at)}
           </p>
         </div>
