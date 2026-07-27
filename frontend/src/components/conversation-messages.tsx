@@ -46,12 +46,14 @@ type TimelineItem =
 type ConversationMessagesProps = {
   conversationId: string;
   conversationStatus: "active" | "completed";
+  targetMessageId: string | null;
   onMessageCreated: (updatedAt: string) => void;
 };
 
 export function ConversationMessages({
   conversationId,
   conversationStatus,
+  targetMessageId,
   onMessageCreated,
 }: ConversationMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -65,6 +67,7 @@ export function ConversationMessages({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const threadScrollRef = useRef<HTMLDivElement>(null);
   const hasPositionedInitialThread = useRef(false);
+  const isViewingSearchTarget = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMessages = useCallback(async () => {
@@ -79,7 +82,7 @@ export function ConversationMessages({
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/conversations/${conversationId}/messages?limit=100`,
+        `${API_URL}/api/v1/conversations/${conversationId}/messages?limit=200`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -187,6 +190,7 @@ export function ConversationMessages({
       return;
     }
 
+    isViewingSearchTarget.current = false;
     const requestId = Date.now();
     const optimisticMessageId = `pending-user-${requestId}`;
     const streamingAssistantId = `pending-assistant-${requestId}`;
@@ -488,13 +492,29 @@ export function ConversationMessages({
       return;
     }
 
+    if (targetMessageId) {
+      const targetMessage = scrollContainer.querySelector<HTMLElement>(
+        `[data-message-id="${targetMessageId}"]`,
+      );
+      if (targetMessage) {
+        targetMessage.scrollIntoView({ block: "center" });
+        isViewingSearchTarget.current = true;
+        hasPositionedInitialThread.current = true;
+        return;
+      }
+    }
+
     const bottom = scrollContainer.scrollHeight - scrollContainer.clientHeight;
     scrollContainer.scrollTop = Math.max(0, bottom - 220);
     hasPositionedInitialThread.current = true;
-  }, [isLoading, timelineItems.length]);
+  }, [isLoading, targetMessageId, timelineItems.length]);
 
   useEffect(() => {
-    if (!hasPositionedInitialThread.current || isLoading) {
+    if (
+      !hasPositionedInitialThread.current ||
+      isLoading ||
+      (isViewingSearchTarget.current && !isSending)
+    ) {
       return;
     }
 
@@ -624,7 +644,10 @@ function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+    <div
+      data-message-id={message.id}
+      className={`flex scroll-m-20 ${isUser ? "justify-end" : "justify-start"}`}
+    >
       <div
         className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${
           isUser

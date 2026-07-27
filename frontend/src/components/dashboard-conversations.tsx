@@ -43,6 +43,7 @@ type ConversationContextValue = {
   error: string;
   reload: () => void;
   touchConversation: (conversationId: string, updatedAt: string) => void;
+  promoteConversation: (conversation: Conversation) => void;
   totalMessages: number | null;
   messageCountRevision: number;
   incrementMessageCount: (amount: number) => void;
@@ -147,6 +148,15 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const promoteConversation = useCallback((conversation: Conversation) => {
+    setConversations((currentConversations) => [
+      conversation,
+      ...currentConversations.filter(
+        (currentConversation) => currentConversation.id !== conversation.id,
+      ),
+    ]);
+  }, []);
+
   const incrementMessageCount = useCallback((amount: number) => {
     if (totalMessages === null) {
       return;
@@ -166,6 +176,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
         error,
         reload: loadConversations,
         touchConversation,
+        promoteConversation,
         totalMessages,
         messageCountRevision,
         incrementMessageCount,
@@ -333,10 +344,14 @@ export function RecentConversations() {
     error,
     reload,
     touchConversation,
+    promoteConversation,
     incrementMessageCount,
   } = useConversations();
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
+    null,
+  );
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<Conversation | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
@@ -346,6 +361,36 @@ export function RecentConversations() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const recentConversations = conversations.slice(0, 4);
+
+  useEffect(() => {
+    const handleOpenSearchResult = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          conversation: Conversation;
+          messageId: string;
+        }>
+      ).detail;
+
+      if (!detail) {
+        return;
+      }
+
+      promoteConversation(detail.conversation);
+      setSelectedConversation(detail.conversation);
+      setSelectedMessageId(detail.messageId);
+      setOpenMenuId(null);
+    };
+
+    window.addEventListener(
+      "open-conversation-message",
+      handleOpenSearchResult,
+    );
+    return () =>
+      window.removeEventListener(
+        "open-conversation-message",
+        handleOpenSearchResult,
+      );
+  }, [promoteConversation]);
 
   function openRenameDialog(conversation: Conversation) {
     setRenameTarget(conversation);
@@ -445,6 +490,7 @@ export function RecentConversations() {
 
       if (selectedConversation?.id === deleteTarget.id) {
         setSelectedConversation(null);
+        setSelectedMessageId(null);
       }
       await reload();
       setDeleteTarget(null);
@@ -508,6 +554,7 @@ export function RecentConversations() {
                 isMenuOpen={openMenuId === conversation.id}
                 onOpen={() => {
                   setSelectedConversation(conversation);
+                  setSelectedMessageId(null);
                   setOpenMenuId(null);
                 }}
                 onToggleMenu={() =>
@@ -526,7 +573,11 @@ export function RecentConversations() {
       {selectedConversation && (
         <ChatWindow
           conversation={selectedConversation}
-          onDismiss={() => setSelectedConversation(null)}
+          targetMessageId={selectedMessageId}
+          onDismiss={() => {
+            setSelectedConversation(null);
+            setSelectedMessageId(null);
+          }}
           onStatusChanged={reload}
           onMessageCreated={(conversationId, updatedAt) => {
             touchConversation(conversationId, updatedAt);
@@ -846,6 +897,7 @@ function ConversationTitleDialog({
 
 type ChatWindowProps = {
   conversation: Conversation;
+  targetMessageId: string | null;
   onDismiss: () => void;
   onStatusChanged: () => void;
   onMessageCreated: (conversationId: string, updatedAt: string) => void;
@@ -853,6 +905,7 @@ type ChatWindowProps = {
 
 function ChatWindow({
   conversation,
+  targetMessageId,
   onDismiss,
   onStatusChanged,
   onMessageCreated,
@@ -971,6 +1024,7 @@ function ChatWindow({
             key={conversation.id}
             conversationId={conversation.id}
             conversationStatus={conversation.status}
+            targetMessageId={targetMessageId}
             onMessageCreated={(updatedAt) =>
               onMessageCreated(conversation.id, updatedAt)
             }

@@ -185,7 +185,7 @@ export function ConversationSearch() {
           <section
             id="conversation-search-results"
             aria-label="Search results"
-            className="mx-auto max-h-[calc(100vh-6rem)] w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20"
+            className="mx-auto max-h-[calc(100vh-6rem)] ml-12 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20 align-left"
           >
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div>
@@ -267,24 +267,41 @@ export function ConversationSearch() {
 
                         <div className="divide-y divide-slate-100">
                           {visibleMessages.map((message) => (
-                            <p
+                            <button
+                              type="button"
                               key={message.id}
-                              className="px-4 py-2 text-xs leading-5 text-slate-600"
+                              onClick={() => {
+                                window.dispatchEvent(
+                                  new CustomEvent(
+                                    "open-conversation-message",
+                                    {
+                                      detail: {
+                                        conversation: result,
+                                        messageId: message.id,
+                                      },
+                                    },
+                                  ),
+                                );
+                                setIsOpen(false);
+                              }}
+                              className="block w-full px-4 py-2 text-left text-xs leading-5 text-slate-600 hover:bg-indigo-50/50"
                             >
-                              <span
-                                className={`font-semibold ${
-                                  message.role === "user"
-                                    ? "text-indigo-600"
-                                    : "text-slate-700"
-                                }`}
-                              >
-                                {message.role === "user" ? "User" : "Assistant"}:
-                              </span>{" "}
-                              <HighlightedText
-                                text={message.content}
-                                query={query}
-                              />
-                            </p>
+                              <span className="line-clamp-2">
+                                <span
+                                  className={`font-semibold ${
+                                    message.role === "user"
+                                      ? "text-indigo-600"
+                                      : "text-slate-700"
+                                  }`}
+                                >
+                                  {message.role === "user" ? "User" : "Assistant"}:
+                                </span>{" "}
+                                <HighlightedText
+                                  text={message.content}
+                                  query={query}
+                                />
+                              </span>
+                            </button>
                           ))}
                         </div>
 
