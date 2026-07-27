@@ -26,11 +26,14 @@ import {
 } from "react";
 
 import { ConversationMessages } from "@/components/conversation-messages";
-import { API_URL, clearSession, getSessionToken } from "@/lib/auth";
+import { useOrganization } from "@/components/organization-provider";
+import { clearSession, getSessionToken } from "@/lib/auth";
+import { organizationApiUrl } from "@/lib/organizations";
 
 export type Conversation = {
   id: string;
-  user_id: string;
+  organization_id: string;
+  created_by_user_id: string | null;
   title: string;
   status: "active" | "completed";
   created_at: string;
@@ -52,6 +55,8 @@ type ConversationContextValue = {
 const ConversationContext = createContext<ConversationContextValue | null>(null);
 
 export function ConversationProvider({ children }: { children: ReactNode }) {
+  const { activeOrganizationId, handleOrganizationForbidden } =
+    useOrganization();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,7 +65,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
 
   const loadConversations = useCallback(async () => {
     const token = getSessionToken();
-    if (!token) {
+    if (!token || !activeOrganizationId) {
       setIsLoading(false);
       return;
     }
@@ -69,14 +74,25 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/conversations?limit=100`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        organizationApiUrl(
+          activeOrganizationId,
+          "/conversations?limit=100",
+        ),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 
@@ -95,17 +111,20 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeOrganizationId, handleOrganizationForbidden]);
 
   const loadMessageCount = useCallback(async () => {
     const token = getSessionToken();
-    if (!token) {
+    if (!token || !activeOrganizationId) {
       return;
     }
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/dashboard/messages/count`,
+        organizationApiUrl(
+          activeOrganizationId,
+          "/dashboard/messages/count",
+        ),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -118,6 +137,11 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Unable to load the message count.");
       }
@@ -127,7 +151,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     } catch {
       setTotalMessages(null);
     }
-  }, []);
+  }, [activeOrganizationId, handleOrganizationForbidden]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -249,6 +273,8 @@ export function MessageCountCard() {
 
 export function StartConversationButton() {
   const { reload } = useConversations();
+  const { activeOrganizationId, handleOrganizationForbidden } =
+    useOrganization();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -259,7 +285,7 @@ export function StartConversationButton() {
     const conversationTitle = title.trim();
     const token = getSessionToken();
 
-    if (!conversationTitle || !token) {
+    if (!conversationTitle || !token || !activeOrganizationId) {
       return;
     }
 
@@ -267,7 +293,7 @@ export function StartConversationButton() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/conversations`, {
+      const response = await fetch(organizationApiUrl(activeOrganizationId, "/conversations"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -278,6 +304,11 @@ export function StartConversationButton() {
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 
@@ -338,6 +369,8 @@ export function StartConversationButton() {
 }
 
 export function RecentConversations() {
+  const { activeOrganizationId, handleOrganizationForbidden } =
+    useOrganization();
   const {
     conversations,
     isLoading,
@@ -404,7 +437,7 @@ export function RecentConversations() {
     const title = renameTitle.trim();
     const token = getSessionToken();
 
-    if (!renameTarget || !title || !token) {
+    if (!renameTarget || !title || !token || !activeOrganizationId) {
       return;
     }
 
@@ -413,7 +446,10 @@ export function RecentConversations() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/conversations/${renameTarget.id}/title`,
+        organizationApiUrl(
+          activeOrganizationId,
+          `/conversations/${renameTarget.id}/title`,
+        ),
         {
           method: "PATCH",
           headers: {
@@ -426,6 +462,11 @@ export function RecentConversations() {
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 
@@ -457,7 +498,7 @@ export function RecentConversations() {
 
   async function handleDelete() {
     const token = getSessionToken();
-    if (!deleteTarget || !token) {
+    if (!deleteTarget || !token || !activeOrganizationId) {
       return;
     }
 
@@ -466,7 +507,10 @@ export function RecentConversations() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/conversations/${deleteTarget.id}`,
+        organizationApiUrl(
+          activeOrganizationId,
+          `/conversations/${deleteTarget.id}`,
+        ),
         {
           method: "DELETE",
           headers: {
@@ -477,6 +521,11 @@ export function RecentConversations() {
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 
@@ -910,6 +959,8 @@ function ChatWindow({
   onStatusChanged,
   onMessageCreated,
 }: ChatWindowProps) {
+  const { activeOrganizationId, handleOrganizationForbidden } =
+    useOrganization();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -917,7 +968,7 @@ function ChatWindow({
 
   async function handleCloseConversation() {
     const token = getSessionToken();
-    if (!token) {
+    if (!token || !activeOrganizationId) {
       clearSession();
       return;
     }
@@ -927,7 +978,10 @@ function ChatWindow({
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/conversations/${conversation.id}/status`,
+        organizationApiUrl(
+          activeOrganizationId,
+          `/conversations/${conversation.id}/status`,
+        ),
         {
           method: "PATCH",
           headers: {
@@ -940,6 +994,11 @@ function ChatWindow({
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 

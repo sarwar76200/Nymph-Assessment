@@ -1,7 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import auth, conversations, dashboard, documents
+from app.routes import (
+    auth,
+    conversations,
+    dashboard,
+    documents,
+    messages,
+    organizations,
+)
 from app.schemas import PlaceholderResponse
 
 app = FastAPI(
@@ -16,7 +23,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://192.168.119.1:3000",
-        "https://nymph-assessment.vercel.app"
+        "https://nymph-assessment.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -36,6 +43,8 @@ async def health_check() -> PlaceholderResponse:
 
 API_PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(organizations.router, prefix=API_PREFIX)
 app.include_router(dashboard.router, prefix=API_PREFIX)
 app.include_router(conversations.router, prefix=API_PREFIX)
+app.include_router(messages.router, prefix=API_PREFIX)
 app.include_router(documents.router, prefix=API_PREFIX)

@@ -8,7 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.database import get_db
 from app.dependencies import CurrentUser
-from app.models import User
+from app.models import Organization, OrganizationMembership, User
 from app.schemas import (
     LoginRequest,
     LoginResponse,
@@ -52,6 +52,18 @@ async def signup(
     db.add(user)
 
     try:
+        await db.flush()
+        organization = Organization(
+            name=f"{credentials.name}'s Organization",
+        )
+        db.add(organization)
+        await db.flush()
+        db.add(
+            OrganizationMembership(
+                organization_id=organization.id,
+                user_id=user.id,
+            )
+        )
         await db.commit()
         await db.refresh(user)
     except IntegrityError as error:

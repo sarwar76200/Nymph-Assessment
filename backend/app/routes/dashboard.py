@@ -1,15 +1,21 @@
 from fastapi import APIRouter
 from sqlalchemy import func, select
 
-from app.dependencies import CurrentUser, DatabaseSession
+from app.dependencies import CurrentOrganization, DatabaseSession
 from app.models import Conversation, Message
 from app.schemas import MessageCountResponse, PlaceholderResponse
 
-router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+router = APIRouter(
+    prefix="/organizations/{organization_id}/dashboard",
+    tags=["Dashboard"],
+)
 
 
 @router.get("", response_model=PlaceholderResponse)
-async def get_dashboard() -> PlaceholderResponse:
+async def get_dashboard(
+    current_organization: CurrentOrganization,
+) -> PlaceholderResponse:
+    del current_organization
     return PlaceholderResponse()
 
 
@@ -19,7 +25,7 @@ async def get_dashboard() -> PlaceholderResponse:
 )
 async def get_message_count(
     db: DatabaseSession,
-    current_user: CurrentUser,
+    current_organization: CurrentOrganization,
 ) -> MessageCountResponse:
     result = await db.execute(
         select(func.count(Message.id))
@@ -27,7 +33,9 @@ async def get_message_count(
             Conversation,
             Message.conversation_id == Conversation.id,
         )
-        .where(Conversation.user_id == current_user.id)
+        .where(
+            Conversation.organization_id == current_organization.id
+        )
     )
     return MessageCountResponse(
         total_messages=result.scalar_one(),

@@ -43,6 +43,39 @@ class LoginResponse(BaseModel):
     user: UserResponse
 
 
+class OrganizationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Organization name must not be blank")
+        return value
+
+
+class OrganizationResponse(BaseModel):
+    id: UUID
+    name: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrganizationMemberCreate(BaseModel):
+    email: EmailStr
+
+
+class OrganizationMembershipResponse(BaseModel):
+    organization_id: UUID
+    user_id: UUID
+    joined_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ConversationStatus(str, Enum):
     active = "active"
     completed = "completed"
@@ -62,7 +95,8 @@ class ConversationCreate(BaseModel):
 
 class ConversationResponse(BaseModel):
     id: UUID
-    user_id: UUID
+    organization_id: UUID
+    created_by_user_id: UUID | None
     title: str
     status: ConversationStatus
     created_at: datetime
@@ -107,6 +141,7 @@ class MessageCreate(BaseModel):
 class MessageResponse(BaseModel):
     id: UUID
     conversation_id: UUID
+    author_user_id: UUID | None
     role: MessageRole
     content: str
     created_at: datetime
@@ -144,6 +179,7 @@ class DocumentMetadataCreate(BaseModel):
 class DocumentResponse(BaseModel):
     id: UUID
     conversation_id: UUID
+    uploaded_by_user_id: UUID | None
     filename: str
     file_type: str
     file_size: int

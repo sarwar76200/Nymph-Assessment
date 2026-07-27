@@ -18,11 +18,18 @@ import {
   useState,
 } from "react";
 
-import { API_URL, clearSession, getSessionToken } from "@/lib/auth";
+import { useOrganization } from "@/components/organization-provider";
+import {
+  clearSession,
+  getSessionToken,
+  getSessionUser,
+} from "@/lib/auth";
+import { organizationApiUrl } from "@/lib/organizations";
 
 type Message = {
   id: string;
   conversation_id: string;
+  author_user_id?: string | null;
   role: "user" | "assistant";
   content: string;
   created_at: string;
@@ -56,7 +63,11 @@ export function ConversationMessages({
   targetMessageId,
   onMessageCreated,
 }: ConversationMessagesProps) {
+  const { activeOrganizationId, handleOrganizationForbidden } =
+    useOrganization();
+  const currentUserId = getSessionUser()?.id;
   const [messages, setMessages] = useState<Message[]>([]);
+  const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
   const [documents, setDocuments] = useState<ThreadDocument[]>([]);
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -70,9 +81,105 @@ export function ConversationMessages({
   const isViewingSearchTarget = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const loadMessageAuthors = useCallback(
+    async (loadedMessages: Message[], token: string) => {
+      if (!activeOrganizationId) {
+        return;
+      }
+
+      const currentUser = getSessionUser();
+      const messagesByAuthor = new Map<string, string>();
+      const immediateNames: Record<string, string> = {};
+
+      loadedMessages.forEach((message) => {
+        if (message.role !== "user" || !message.author_user_id) {
+          return;
+        }
+
+        if (message.author_user_id === currentUser?.id) {
+          immediateNames[message.author_user_id] = "You";
+          return;
+        }
+
+        if (!messagesByAuthor.has(message.author_user_id)) {
+          messagesByAuthor.set(message.author_user_id, message.id);
+        }
+      });
+
+      if (Object.keys(immediateNames).length > 0) {
+        setAuthorNames((currentNames) => ({
+          ...currentNames,
+          ...immediateNames,
+        }));
+      }
+
+      const results = await Promise.all(
+        Array.from(messagesByAuthor.entries()).map(
+          async ([authorUserId, messageId]) => {
+            try {
+              const response = await fetch(
+                organizationApiUrl(
+                  activeOrganizationId,
+                  `/messages/${messageId}/author`,
+                ),
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                },
+              );
+
+              if (response.status === 401) {
+                clearSession();
+                return null;
+              }
+
+              if (response.status === 403) {
+                return "forbidden" as const;
+              }
+
+              if (!response.ok) {
+                return { authorUserId, name: "Unknown user" };
+              }
+
+              const author = (await response.json()) as {
+                id: string;
+                name: string;
+              };
+              return { authorUserId: author.id, name: author.name };
+            } catch {
+              return { authorUserId, name: "Unknown user" };
+            }
+          },
+        ),
+      );
+
+      if (results.some((result) => result === "forbidden")) {
+        await handleOrganizationForbidden();
+        return;
+      }
+
+      const loadedNames = results.reduce<Record<string, string>>(
+        (names, result) => {
+          if (result && result !== "forbidden") {
+            names[result.authorUserId] = result.name;
+          }
+          return names;
+        },
+        {},
+      );
+
+      setAuthorNames((currentNames) => ({
+        ...currentNames,
+        ...loadedNames,
+      }));
+    },
+    [activeOrganizationId, handleOrganizationForbidden],
+  );
+
   const loadMessages = useCallback(async () => {
     const token = getSessionToken();
-    if (!token) {
+    if (!token || !activeOrganizationId) {
       clearSession();
       return;
     }
@@ -82,7 +189,10 @@ export function ConversationMessages({
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/conversations/${conversationId}/messages?limit=200`,
+        organizationApiUrl(
+          activeOrganizationId,
+          `/conversations/${conversationId}/messages?limit=200`,
+        ),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -95,6 +205,11 @@ export function ConversationMessages({
         return;
       }
 
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
+        return;
+      }
+
       if (response.status === 404) {
         throw new Error("This conversation is no longer available.");
       }
@@ -103,7 +218,9 @@ export function ConversationMessages({
         throw new Error("Unable to load the message thread.");
       }
 
-      setMessages((await response.json()) as Message[]);
+      const loadedMessages = (await response.json()) as Message[];
+      setMessages(loadedMessages);
+      void loadMessageAuthors(loadedMessages, token);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -113,24 +230,37 @@ export function ConversationMessages({
     } finally {
       setIsLoading(false);
     }
-  }, [conversationId]);
+  }, [
+    activeOrganizationId,
+    conversationId,
+    handleOrganizationForbidden,
+    loadMessageAuthors,
+  ]);
 
   const loadDocuments = useCallback(async () => {
     const token = getSessionToken();
-    if (!token) {
+    if (!token || !activeOrganizationId) {
       clearSession();
       return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/documents?limit=100`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        organizationApiUrl(activeOrganizationId, "/documents?limit=100"),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 
@@ -147,7 +277,11 @@ export function ConversationMessages({
     } catch {
       // Messages remain usable if document metadata cannot be loaded.
     }
-  }, [conversationId]);
+  }, [
+    activeOrganizationId,
+    conversationId,
+    handleOrganizationForbidden,
+  ]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -186,17 +320,24 @@ export function ConversationMessages({
     const messageContent = content.trim();
     const token = getSessionToken();
 
-    if (!messageContent || !token || conversationStatus === "completed") {
+    if (
+      !messageContent ||
+      !token ||
+      !activeOrganizationId ||
+      conversationStatus === "completed"
+    ) {
       return;
     }
 
     isViewingSearchTarget.current = false;
     const requestId = Date.now();
+    const currentUser = getSessionUser();
     const optimisticMessageId = `pending-user-${requestId}`;
     const streamingAssistantId = `pending-assistant-${requestId}`;
     const optimisticMessage: Message = {
       id: optimisticMessageId,
       conversation_id: conversationId,
+      author_user_id: currentUser?.id ?? null,
       role: "user",
       content: messageContent,
       created_at: new Date().toISOString(),
@@ -211,7 +352,10 @@ export function ConversationMessages({
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/conversations/${conversationId}/messages`,
+        organizationApiUrl(
+          activeOrganizationId,
+          `/conversations/${conversationId}/messages`,
+        ),
         {
           method: "POST",
           headers: {
@@ -224,6 +368,11 @@ export function ConversationMessages({
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 
@@ -405,7 +554,7 @@ export function ConversationMessages({
     }
 
     const token = getSessionToken();
-    if (!token) {
+    if (!token || !activeOrganizationId) {
       clearSession();
       return;
     }
@@ -415,7 +564,10 @@ export function ConversationMessages({
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/conversations/${conversationId}/documents`,
+        organizationApiUrl(
+          activeOrganizationId,
+          `/conversations/${conversationId}/documents`,
+        ),
         {
           method: "POST",
           headers: {
@@ -432,6 +584,11 @@ export function ConversationMessages({
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 
@@ -559,6 +716,13 @@ export function ConversationMessages({
                 <MessageBubble
                   key={`message-${item.message.id}`}
                   message={item.message}
+                  authorName={
+                    item.message.author_user_id === currentUserId
+                      ? "You"
+                      : item.message.author_user_id
+                      ? authorNames[item.message.author_user_id]
+                      : undefined
+                  }
                 />
               ) : (
                 <DocumentTimelineItem
@@ -640,8 +804,21 @@ export function ConversationMessages({
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({
+  message,
+  authorName,
+}: {
+  message: Message;
+  authorName?: string;
+}) {
   const isUser = message.role === "user";
+  const displayedAuthor =
+    authorName ??
+    (message.pending
+      ? "You"
+      : message.author_user_id
+        ? "Member"
+        : "Unknown user");
 
   return (
     <div
@@ -668,6 +845,7 @@ function MessageBubble({ message }: { message: Message }) {
                 : "text-slate-400"
           }`}
         >
+          {isUser && `${displayedAuthor} · `}
           {message.pending
             ? isUser
               ? "Sending..."

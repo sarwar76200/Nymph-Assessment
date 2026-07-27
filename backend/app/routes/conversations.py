@@ -9,8 +9,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies import CurrentUser, DatabaseSession
-from app.models import Conversation, Message, User
+from app.dependencies import (
+    CurrentOrganization,
+    CurrentUser,
+    DatabaseSession,
+)
+from app.models import Conversation, Message, Organization
 from app.schemas import (
     ConversationCreate,
     ConversationResponse,
@@ -19,10 +23,12 @@ from app.schemas import (
     ConversationTitleUpdate,
     MessageCreate,
     MessageResponse,
-    PlaceholderResponse,
 )
 
-router = APIRouter(prefix="/conversations", tags=["Conversations"])
+router = APIRouter(
+    prefix="/organizations/{organization_id}/conversations",
+    tags=["Conversations"],
+)
 LOREM_PHRASES = (
     "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod",
     "tempor incididunt ut labore et dolore magna aliqua Ut enim ad minim",
@@ -38,15 +44,15 @@ ASSISTANT_RESPONSE = " ".join(
 )
 
 
-async def get_user_conversation(
+async def get_organization_conversation(
     conversation_id: UUID,
-    user: User,
+    organization: Organization,
     db: AsyncSession,
 ) -> Conversation:
     result = await db.execute(
         select(Conversation).where(
             Conversation.id == conversation_id,
-            Conversation.user_id == user.id,
+            Conversation.organization_id == organization.id,
         )
     )
     conversation = result.scalar_one_or_none()
@@ -62,10 +68,12 @@ async def save_message(
     conversation: Conversation,
     role: str,
     content: str,
+    author_user_id: UUID | None,
     db: AsyncSession,
 ) -> MessageResponse:
     message = Message(
         conversation_id=conversation.id,
+        author_user_id=author_user_id,
         role=role,
         content=content,
     )
@@ -108,13 +116,15 @@ async def stream_chat_response(
 @router.get("", response_model=list[ConversationResponse])
 async def list_conversations(
     db: DatabaseSession,
-    current_user: CurrentUser,
+    current_organization: CurrentOrganization,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> list[ConversationResponse]:
     result = await db.execute(
         select(Conversation)
-        .where(Conversation.user_id == current_user.id)
+        .where(
+            Conversation.organization_id == current_organization.id
+        )
         .order_by(
             case((Conversation.status == "active", 0), else_=1),
             Conversation.updated_at.desc(),
@@ -138,9 +148,11 @@ async def create_conversation(
     payload: ConversationCreate,
     db: DatabaseSession,
     current_user: CurrentUser,
+    current_organization: CurrentOrganization,
 ) -> ConversationResponse:
     conversation = Conversation(
-        user_id=current_user.id,
+        organization_id=current_organization.id,
+        created_by_user_id=current_user.id,
         title=payload.title,
         status="active",
     )
@@ -157,7 +169,7 @@ async def create_conversation(
 )
 async def search_conversations(
     db: DatabaseSession,
-    current_user: CurrentUser,
+    current_organization: CurrentOrganization,
     query: str = Query(min_length=1, max_length=200),
 ) -> list[ConversationSearchResult]:
     search_term = query.strip().lower()
@@ -174,7 +186,7 @@ async def search_conversations(
             Message.conversation_id == Conversation.id,
         )
         .where(
-            Conversation.user_id == current_user.id,
+            Conversation.organization_id == current_organization.id,
             func.strpos(func.lower(Message.content), search_term) > 0,
         )
         .order_by(
@@ -200,10 +212,21 @@ async def search_conversations(
     return list(conversations.values())
 
 
-@router.get("/{conversation_id}", response_model=PlaceholderResponse)
-async def get_conversation(conversation_id: UUID) -> PlaceholderResponse:
-    del conversation_id
-    return PlaceholderResponse()
+@router.get(
+    "/{conversation_id}",
+    response_model=ConversationResponse,
+)
+async def get_conversation(
+    conversation_id: UUID,
+    db: DatabaseSession,
+    current_organization: CurrentOrganization,
+) -> ConversationResponse:
+    conversation = await get_organization_conversation(
+        conversation_id,
+        current_organization,
+        db,
+    )
+    return ConversationResponse.model_validate(conversation)
 
 
 @router.patch(
@@ -214,11 +237,11 @@ async def update_conversation_title(
     conversation_id: UUID,
     payload: ConversationTitleUpdate,
     db: DatabaseSession,
-    current_user: CurrentUser,
+    current_organization: CurrentOrganization,
 ) -> ConversationResponse:
-    conversation = await get_user_conversation(
+    conversation = await get_organization_conversation(
         conversation_id,
-        current_user,
+        current_organization,
         db,
     )
     conversation.title = payload.title
@@ -235,11 +258,11 @@ async def update_conversation_status(
     conversation_id: UUID,
     payload: ConversationStatusUpdate,
     db: DatabaseSession,
-    current_user: CurrentUser,
+    current_organization: CurrentOrganization,
 ) -> ConversationResponse:
-    conversation = await get_user_conversation(
+    conversation = await get_organization_conversation(
         conversation_id,
-        current_user,
+        current_organization,
         db,
     )
     conversation.status = payload.status.value
@@ -255,11 +278,11 @@ async def update_conversation_status(
 async def delete_conversation(
     conversation_id: UUID,
     db: DatabaseSession,
-    current_user: CurrentUser,
+    current_organization: CurrentOrganization,
 ) -> Response:
-    conversation = await get_user_conversation(
+    conversation = await get_organization_conversation(
         conversation_id,
-        current_user,
+        current_organization,
         db,
     )
     await db.delete(conversation)
@@ -274,13 +297,13 @@ async def delete_conversation(
 async def list_messages(
     conversation_id: UUID,
     db: DatabaseSession,
-    current_user: CurrentUser,
+    current_organization: CurrentOrganization,
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> list[MessageResponse]:
-    conversation = await get_user_conversation(
+    conversation = await get_organization_conversation(
         conversation_id,
-        current_user,
+        current_organization,
         db,
     )
     result = await db.execute(
@@ -304,7 +327,7 @@ async def list_messages(
 async def search_conversation_messages(
     conversation_id: UUID,
     db: DatabaseSession,
-    current_user: CurrentUser,
+    current_organization: CurrentOrganization,
     query: str = Query(min_length=1, max_length=200),
 ) -> list[MessageResponse]:
     search_term = query.strip().lower()
@@ -314,9 +337,9 @@ async def search_conversation_messages(
             detail="Search query must not be blank",
         )
 
-    conversation = await get_user_conversation(
+    conversation = await get_organization_conversation(
         conversation_id,
-        current_user,
+        current_organization,
         db,
     )
     result = await db.execute(
@@ -343,22 +366,25 @@ async def create_message(
     payload: MessageCreate,
     db: DatabaseSession,
     current_user: CurrentUser,
+    current_organization: CurrentOrganization,
 ) -> StreamingResponse:
-    conversation = await get_user_conversation(
+    conversation = await get_organization_conversation(
         conversation_id,
-        current_user,
+        current_organization,
         db,
     )
     user_message = await save_message(
         conversation,
         "user",
         payload.content,
+        current_user.id,
         db,
     )
     assistant_message = await save_message(
         conversation,
         "assistant",
         ASSISTANT_RESPONSE,
+        None,
         db,
     )
     return StreamingResponse(

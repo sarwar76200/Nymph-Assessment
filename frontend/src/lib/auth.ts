@@ -86,6 +86,7 @@ export function saveUser(user: AuthUser): void {
 export function clearSession(): void {
   localStorage.removeItem("access_token");
   localStorage.removeItem("auth_user");
+  localStorage.removeItem("active_organization_id");
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
@@ -101,6 +102,19 @@ export function subscribeToSession(onStoreChange: () => void): () => void {
 
 export function getSessionToken(): string | null | undefined {
   return window.localStorage.getItem("access_token");
+}
+
+export function getSessionUser(): AuthUser | null {
+  const storedUser = window.localStorage.getItem("auth_user");
+  if (!storedUser) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(storedUser) as AuthUser;
+  } catch {
+    return null;
+  }
 }
 
 export function getServerSessionToken(): undefined {

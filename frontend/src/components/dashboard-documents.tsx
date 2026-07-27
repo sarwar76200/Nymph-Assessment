@@ -20,11 +20,14 @@ import {
 } from "react";
 
 import { useConversations } from "@/components/dashboard-conversations";
-import { API_URL, clearSession, getSessionToken } from "@/lib/auth";
+import { useOrganization } from "@/components/organization-provider";
+import { clearSession, getSessionToken } from "@/lib/auth";
+import { organizationApiUrl } from "@/lib/organizations";
 
 type DocumentMetadata = {
   id: string;
   conversation_id: string;
+  uploaded_by_user_id: string | null;
   filename: string;
   file_type: "pdf" | "docx" | "txt";
   file_size: number;
@@ -44,6 +47,8 @@ const ALLOWED_FILE_TYPES = ["pdf", "docx", "txt"] as const;
 
 export function DocumentProvider({ children }: { children: ReactNode }) {
   const { conversations } = useConversations();
+  const { activeOrganizationId, handleOrganizationForbidden } =
+    useOrganization();
   const [documents, setDocuments] = useState<DocumentMetadata[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -55,7 +60,7 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
 
   const loadDocuments = useCallback(async () => {
     const token = getSessionToken();
-    if (!token) {
+    if (!token || !activeOrganizationId) {
       setIsLoading(false);
       return;
     }
@@ -64,14 +69,22 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/documents?limit=100`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        organizationApiUrl(activeOrganizationId, "/documents?limit=100"),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 
@@ -89,7 +102,7 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeOrganizationId, handleOrganizationForbidden]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -162,7 +175,13 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
     const token = getSessionToken();
     const fileType = selectedFile ? getFileType(selectedFile.name) : null;
 
-    if (!token || !selectedConversationId || !selectedFile || !fileType) {
+    if (
+      !token ||
+      !activeOrganizationId ||
+      !selectedConversationId ||
+      !selectedFile ||
+      !fileType
+    ) {
       setUploadError("Select a conversation and a supported file.");
       return;
     }
@@ -172,7 +191,10 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/v1/conversations/${selectedConversationId}/documents`,
+        organizationApiUrl(
+          activeOrganizationId,
+          `/conversations/${selectedConversationId}/documents`,
+        ),
         {
           method: "POST",
           headers: {
@@ -189,6 +211,11 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
 
       if (response.status === 401) {
         clearSession();
+        return;
+      }
+
+      if (response.status === 403) {
+        await handleOrganizationForbidden();
         return;
       }
 

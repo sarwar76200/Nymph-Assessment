@@ -22,6 +22,11 @@ import {
   RecentDocuments,
 } from "@/components/dashboard-documents";
 import { AuthGuard } from "@/components/auth-guard";
+import { OrganizationProvider } from "@/components/organization-provider";
+import {
+  OrganizationGate,
+  OrganizationSwitcher,
+} from "@/components/organization-switcher";
 import {
   DashboardUser,
   UserInformationCard,
@@ -37,11 +42,15 @@ const navItems = [
 export default function Home() {
   return (
     <AuthGuard>
-      <ConversationProvider>
-        <DocumentProvider>
-          <Dashboard />
-        </DocumentProvider>
-      </ConversationProvider>
+      <OrganizationProvider>
+        <OrganizationGate>
+          <ConversationProvider>
+            <DocumentProvider>
+              <Dashboard />
+            </DocumentProvider>
+          </ConversationProvider>
+        </OrganizationGate>
+      </OrganizationProvider>
     </AuthGuard>
   );
 }
@@ -60,7 +69,9 @@ function Dashboard() {
           </div>
         </div>
 
-        <nav className="mt-9 space-y-1">
+        <OrganizationSwitcher />
+
+        <nav className="mt-6 space-y-1">
           <p className="mb-3 px-3 text-[10px] font-bold tracking-[0.16em] text-slate-400 uppercase">
             Workspace
           </p>

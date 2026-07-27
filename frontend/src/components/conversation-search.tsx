@@ -10,11 +10,14 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { API_URL, clearSession, getSessionToken } from "@/lib/auth";
+import { useOrganization } from "@/components/organization-provider";
+import { clearSession, getSessionToken } from "@/lib/auth";
+import { organizationApiUrl } from "@/lib/organizations";
 
 type SearchMessage = {
   id: string;
   conversation_id: string;
+  author_user_id: string | null;
   role: "user" | "assistant";
   content: string;
   created_at: string;
@@ -22,7 +25,8 @@ type SearchMessage = {
 
 type SearchResult = {
   id: string;
-  user_id: string;
+  organization_id: string;
+  created_by_user_id: string | null;
   title: string;
   status: "active" | "completed";
   created_at: string;
@@ -31,6 +35,8 @@ type SearchResult = {
 };
 
 export function ConversationSearch() {
+  const { activeOrganizationId, handleOrganizationForbidden } =
+    useOrganization();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [expandedConversations, setExpandedConversations] = useState<
@@ -49,7 +55,7 @@ export function ConversationSearch() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(async () => {
       const token = getSessionToken();
-      if (!token) {
+      if (!token || !activeOrganizationId) {
         clearSession();
         return;
       }
@@ -60,7 +66,10 @@ export function ConversationSearch() {
       try {
         const parameters = new URLSearchParams({ query: searchQuery });
         const response = await fetch(
-          `${API_URL}/api/v1/conversations/search?${parameters}`,
+          organizationApiUrl(
+            activeOrganizationId,
+            `/conversations/search?${parameters}`,
+          ),
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -71,6 +80,11 @@ export function ConversationSearch() {
 
         if (response.status === 401) {
           clearSession();
+          return;
+        }
+
+        if (response.status === 403) {
+          await handleOrganizationForbidden();
           return;
         }
 
@@ -101,7 +115,7 @@ export function ConversationSearch() {
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [query]);
+  }, [activeOrganizationId, handleOrganizationForbidden, query]);
 
   function handleQueryChange(value: string) {
     setQuery(value);

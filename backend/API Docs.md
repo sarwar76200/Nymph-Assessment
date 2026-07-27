@@ -1,92 +1,110 @@
 # Nymph Customer Support API
 
-REST API for authentication, customer-support conversations, messages, document
-metadata, search, and dashboard statistics.
-
-## URLs
+## Basics
 
 - Local base URL: `http://localhost:8000`
 - API prefix: `/api/v1`
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-- OpenAPI schema: `http://localhost:8000/openapi.json`
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+- OpenAPI schema: `/openapi.json`
 
-JSON endpoints expect `Content-Type: application/json`.
+JSON requests use `Content-Type: application/json`.
 
-## Authentication
+## Authentication and organization context
 
-Except for signup, login, root, and health checks, implemented endpoints require a
-JWT bearer token:
+Protected endpoints require:
 
 ```http
 Authorization: Bearer <access_token>
 ```
 
-Tokens are returned by signup and login. A missing, invalid, or expired token
-returns:
+The JWT identifies only the user. Organization-scoped endpoints include the
+selected organization UUID in the path:
+
+```text
+/api/v1/organizations/{organization_id}/...
+```
+
+The same token may be used to switch organizations. The server verifies
+membership on every scoped request.
+
+- Missing, invalid, or expired token: `401 Unauthorized`
+- User is not an organization member: `403 Forbidden`
+- Resource is outside the selected organization: `404 Not Found`
+- Invalid body, path, or query value: `422 Unprocessable Entity`
+
+## Response objects
+
+User:
 
 ```json
 {
-  "detail": "Could not validate credentials"
+  "id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
+  "email": "alex@example.com",
+  "name": "Alex Smith",
+  "created_at": "2026-07-28T12:00:00Z"
 }
 ```
 
-with status `401 Unauthorized`.
-
-Resources are scoped to the authenticated user. A conversation belonging to
-another user is reported as `404 Not Found` rather than exposing its existence.
-
-## Common validation errors
-
-FastAPI returns `422 Unprocessable Entity` when a path, query, or body value is
-invalid. The response follows FastAPI's validation-error format:
+Organization:
 
 ```json
 {
-  "detail": [
-    {
-      "type": "string_too_short",
-      "loc": ["body", "password"],
-      "msg": "String should have at least 8 characters",
-      "input": "short",
-      "ctx": {
-        "min_length": 8
-      }
-    }
-  ]
+  "id": "ff8a3d86-d702-44ef-a1f7-c369528cfe2d",
+  "name": "Alex Smith's Organization",
+  "created_at": "2026-07-28T12:00:00Z",
+  "updated_at": "2026-07-28T12:00:00Z"
 }
 ```
 
-## System
-
-### Root
-
-`GET /`
-
-Returns a placeholder response:
+Conversation:
 
 ```json
 {
-  "message": "Lorem ipsum dolor sit amet."
+  "id": "19237fe6-4240-410a-9ace-ec1341410dd3",
+  "organization_id": "ff8a3d86-d702-44ef-a1f7-c369528cfe2d",
+  "created_by_user_id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
+  "title": "Billing assistance",
+  "status": "active",
+  "created_at": "2026-07-28T12:00:00Z",
+  "updated_at": "2026-07-28T12:05:00Z"
 }
 ```
 
-### Health check
+Message:
 
-`GET /health`
+```json
+{
+  "id": "6a9c873a-7ec1-41ee-9161-798117f223ab",
+  "conversation_id": "19237fe6-4240-410a-9ace-ec1341410dd3",
+  "author_user_id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
+  "role": "user",
+  "content": "I need help with billing.",
+  "created_at": "2026-07-28T12:01:00Z"
+}
+```
 
-Returns `200 OK` with the same placeholder response. This currently confirms
-only that the API process is responding; it does not test the database.
+Assistant messages have `"author_user_id": null`.
 
-## Authentication endpoints
+Document metadata:
 
-### Create an account
+```json
+{
+  "id": "fa32e818-0d09-4448-bb64-326bcadbb2aa",
+  "conversation_id": "19237fe6-4240-410a-9ace-ec1341410dd3",
+  "uploaded_by_user_id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
+  "filename": "billing-guide.pdf",
+  "file_type": "pdf",
+  "file_size": 245760,
+  "uploaded_at": "2026-07-28T12:10:00Z"
+}
+```
+
+## Authentication
+
+### Signup
 
 `POST /api/v1/auth/signup`
-
-Authentication is not required.
-
-Request:
 
 ```json
 {
@@ -96,13 +114,8 @@ Request:
 }
 ```
 
-Validation:
-
-- `name`: 1–120 characters after trimming
-- `email`: valid email address
-- `password`: 8–128 characters
-
-Success: `201 Created`
+Creates the user, a personal organization, and membership in one transaction.
+Returns `201 Created` with:
 
 ```json
 {
@@ -112,26 +125,16 @@ Success: `201 Created`
     "id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
     "email": "alex@example.com",
     "name": "Alex Smith",
-    "created_at": "2026-07-27T12:00:00Z"
+    "created_at": "2026-07-28T12:00:00Z"
   }
 }
 ```
 
-Duplicate email: `409 Conflict`
+Duplicate email returns `409 Conflict`.
 
-```json
-{
-  "detail": "An account with this email already exists"
-}
-```
-
-### Log in
+### Login
 
 `POST /api/v1/auth/login`
-
-Authentication is not required.
-
-Request:
 
 ```json
 {
@@ -140,82 +143,83 @@ Request:
 }
 ```
 
-Success: `200 OK`
+Returns `200 OK` with the same token response as signup. Incorrect credentials
+return `401 Unauthorized`.
 
-The response has the same shape as signup.
-
-Incorrect credentials: `401 Unauthorized`
-
-```json
-{
-  "detail": "Incorrect email or password"
-}
-```
-
-### Get the current user
+### Current user
 
 `GET /api/v1/auth/me`
 
-Success: `200 OK`
+Returns the authenticated user.
+
+## Organizations
+
+All organization members have equal permissions.
+
+### List organizations
+
+`GET /api/v1/organizations`
+
+Returns the organizations the current user belongs to, sorted by name.
+
+### Create organization
+
+`POST /api/v1/organizations`
 
 ```json
 {
-  "id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
-  "email": "alex@example.com",
-  "name": "Alex Smith",
-  "created_at": "2026-07-27T12:00:00Z"
+  "name": "Nymph Support"
 }
 ```
 
-## Conversation endpoints
+Returns `201 Created`. The creator is automatically added as a member.
 
-Conversation object:
+### Add an existing user
+
+`POST /api/v1/organizations/{organization_id}/members`
 
 ```json
 {
-  "id": "19237fe6-4240-410a-9ace-ec1341410dd3",
-  "user_id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
-  "title": "Billing assistance",
-  "status": "active",
-  "created_at": "2026-07-27T12:00:00Z",
-  "updated_at": "2026-07-27T12:05:00Z"
+  "email": "member@example.com"
 }
 ```
 
-Valid statuses are `active` and `completed`.
+The caller must already belong to the organization.
+
+Success: `201 Created`
+
+```json
+{
+  "organization_id": "ff8a3d86-d702-44ef-a1f7-c369528cfe2d",
+  "user_id": "338760e5-6cbd-46ad-8f24-82fd4c1fc647",
+  "joined_at": "2026-07-28T12:20:00Z"
+}
+```
+
+- User does not exist: `404 Not Found`
+- User is already a member: `409 Conflict`
+
+## Conversations
+
+Base path:
+
+```text
+/api/v1/organizations/{organization_id}/conversations
+```
 
 ### List conversations
 
-`GET /api/v1/conversations`
+`GET {base_path}?limit=50&offset=0`
 
-Optional query parameters:
+Returns only the selected organization's conversations. Active conversations
+come first; each status group is sorted by most recent update.
 
-- `limit`: 1–100; default `50`
-- `offset`: zero or greater; default `0`
+- `limit`: 1–100, default `50`
+- `offset`: zero or greater, default `0`
 
-Active conversations are returned before completed conversations. Each group is
-sorted by `updated_at` descending.
+### Create conversation
 
-Success: `200 OK`
-
-```json
-[
-  {
-    "id": "19237fe6-4240-410a-9ace-ec1341410dd3",
-    "user_id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
-    "title": "Billing assistance",
-    "status": "active",
-    "created_at": "2026-07-27T12:00:00Z",
-    "updated_at": "2026-07-27T12:05:00Z"
-  }
-]
-```
-
-### Create a conversation
-
-`POST /api/v1/conversations`
-
-Request:
+`POST {base_path}`
 
 ```json
 {
@@ -223,51 +227,25 @@ Request:
 }
 ```
 
-The title must contain 1–200 non-whitespace characters. New conversations have
-the `active` status.
+Returns `201 Created`. The status defaults to `active`, the path supplies
+`organization_id`, and authentication supplies `created_by_user_id`.
 
-Success: `201 Created`, returning the conversation object.
+### Search conversations
 
-### Search conversations by message content
+`GET {base_path}/search?query=billing`
 
-`GET /api/v1/conversations/search?query=billing`
+Uses case-insensitive literal substring matching against message content.
+Returns conversations with their matching messages, newest conversation first.
 
-Search uses case-insensitive literal substring matching against message content.
-Only conversations containing at least one match are returned. Conversations
-are sorted by `updated_at` descending, and matching messages within each
-conversation are sorted oldest first.
+### Get conversation
 
-The query must contain 1–200 characters and cannot contain only whitespace.
+`GET {base_path}/{conversation_id}`
 
-Success: `200 OK`
+Returns the conversation when it belongs to the selected organization.
 
-```json
-[
-  {
-    "id": "19237fe6-4240-410a-9ace-ec1341410dd3",
-    "user_id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
-    "title": "Billing assistance",
-    "status": "active",
-    "created_at": "2026-07-27T12:00:00Z",
-    "updated_at": "2026-07-27T12:05:00Z",
-    "matched_messages": [
-      {
-        "id": "6a9c873a-7ec1-41ee-9161-798117f223ab",
-        "conversation_id": "19237fe6-4240-410a-9ace-ec1341410dd3",
-        "role": "user",
-        "content": "I need help with billing.",
-        "created_at": "2026-07-27T12:01:00Z"
-      }
-    ]
-  }
-]
-```
+### Rename conversation
 
-### Rename a conversation
-
-`PATCH /api/v1/conversations/{conversation_id}/title`
-
-Request:
+`PATCH {base_path}/{conversation_id}/title`
 
 ```json
 {
@@ -275,21 +253,9 @@ Request:
 }
 ```
 
-Success: `200 OK`, returning the updated conversation.
+### Change status
 
-Conversation unavailable: `404 Not Found`
-
-```json
-{
-  "detail": "Conversation not found"
-}
-```
-
-### Change conversation status
-
-`PATCH /api/v1/conversations/{conversation_id}/status`
-
-Request:
+`PATCH {base_path}/{conversation_id}/status`
 
 ```json
 {
@@ -297,67 +263,52 @@ Request:
 }
 ```
 
-Success: `200 OK`, returning the updated conversation.
+Valid statuses are `active` and `completed`.
 
-### Delete a conversation
+### Delete conversation
 
-`DELETE /api/v1/conversations/{conversation_id}`
+`DELETE {base_path}/{conversation_id}`
 
-Success: `204 No Content`
+Returns `204 No Content`. Database cascades remove associated messages and
+document metadata.
 
-Deleting a conversation also deletes its associated messages and document
-metadata when the database foreign keys use `ON DELETE CASCADE`.
+## Messages
 
-### Get one conversation
+### Get a message author
 
-`GET /api/v1/conversations/{conversation_id}`
+`GET /api/v1/organizations/{organization_id}/messages/{message_id}/author`
 
-This route currently returns placeholder data and is not yet a functional
-conversation-detail endpoint.
+Returns the user who authored a user message. The message must belong to a
+conversation in the selected organization.
 
-## Message endpoints
-
-Message object:
+Assistant messages, missing messages, and messages outside the selected
+organization return `404 Not Found`:
 
 ```json
 {
-  "id": "6a9c873a-7ec1-41ee-9161-798117f223ab",
-  "conversation_id": "19237fe6-4240-410a-9ace-ec1341410dd3",
-  "role": "user",
-  "content": "I need help with billing.",
-  "created_at": "2026-07-27T12:01:00Z"
+  "detail": "Message author not found"
 }
 ```
 
-Valid roles are `user` and `assistant`.
+### List messages
 
-### List conversation messages
-
-`GET /api/v1/conversations/{conversation_id}/messages`
-
-Optional query parameters:
-
-- `limit`: 1–200; default `100`
-- `offset`: zero or greater; default `0`
+`GET {base_path}/{conversation_id}/messages?limit=100&offset=0`
 
 Messages are returned oldest first.
 
-Success: `200 OK`, returning an array of message objects.
+- `limit`: 1–200, default `100`
+- `offset`: zero or greater, default `0`
 
-### Search within one conversation
+### Search within a conversation
 
-`GET /api/v1/conversations/{conversation_id}/messages/search?query=billing`
+`GET {base_path}/{conversation_id}/messages/search?query=billing`
 
-Uses case-insensitive literal substring matching and returns matching messages
-oldest first.
-
-Success: `200 OK`, returning an array of message objects.
+Uses case-insensitive literal substring matching and returns matches oldest
+first.
 
 ### Send a message and stream the assistant response
 
-`POST /api/v1/conversations/{conversation_id}/messages`
-
-Request:
+`POST {base_path}/{conversation_id}/messages`
 
 ```json
 {
@@ -365,80 +316,54 @@ Request:
 }
 ```
 
-The content cannot be blank. The server stores the user message, generates and
-stores a simulated assistant message, and returns an SSE stream.
-
-Success: `200 OK`
-
-Response content type:
-
-```text
-text/event-stream
-```
+Returns `200 OK` with `Content-Type: text/event-stream`. The user message stores
+the authenticated user as `author_user_id`; the assistant message has no author.
 
 Event sequence:
 
 ```text
 event: user_message
-data: {"id":"...","conversation_id":"...","role":"user","content":"How can I update my billing information?","created_at":"..."}
+data: {"id":"...","author_user_id":"...","role":"user","content":"..."}
 
 event: assistant_chunk
 data: {"content":"Lorem ipsum dolor sit amet "}
 
-event: assistant_chunk
-data: {"content":"consectetur adipiscing elit sed do "}
-
 event: assistant_message
-data: {"id":"...","conversation_id":"...","role":"assistant","content":"<complete response>","created_at":"..."}
+data: {"id":"...","author_user_id":null,"role":"assistant","content":"..."}
 
 event: done
 data: {}
 
 ```
 
-`assistant_chunk` events contain display chunks. The final
-`assistant_message` event contains the complete persisted message and should
-replace the temporary streaming message in the client.
+Use `fetch()` and consume `response.body`; browser `EventSource` supports only
+GET requests.
 
-Because this is a `POST` request, clients should use `fetch()` and read
-`response.body`; the browser `EventSource` API supports only `GET`.
+## Documents
 
-## Document metadata endpoints
+Documents derive organization ownership through their conversation. They do not
+store `organization_id`, and only metadata is retained.
 
-Only metadata is stored. The API does not upload or retain file contents.
+### Get a document uploader
 
-Document object:
+`GET /api/v1/organizations/{organization_id}/documents/{document_id}/uploader`
 
-```json
-{
-  "id": "fa32e818-0d09-4448-bb64-326bcadbb2aa",
-  "conversation_id": "19237fe6-4240-410a-9ace-ec1341410dd3",
-  "filename": "billing-guide.pdf",
-  "file_type": "pdf",
-  "file_size": 245760,
-  "uploaded_at": "2026-07-27T12:10:00Z"
-}
-```
+Returns the user who uploaded the document metadata. Missing documents,
+documents without a retained uploader, and documents outside the selected
+organization return `404 Not Found`.
 
 ### List documents
 
-`GET /api/v1/documents`
+`GET /api/v1/organizations/{organization_id}/documents?limit=50&offset=0`
 
-Returns documents from all conversations owned by the authenticated user,
-newest first.
+Returns metadata from conversations in the selected organization, newest first.
 
-Optional query parameters:
-
-- `limit`: 1–100; default `50`
-- `offset`: zero or greater; default `0`
-
-Success: `200 OK`, returning an array of document objects.
+- `limit`: 1–100, default `50`
+- `offset`: zero or greater, default `0`
 
 ### Add document metadata
 
-`POST /api/v1/conversations/{conversation_id}/documents`
-
-Request:
+`POST /api/v1/organizations/{organization_id}/conversations/{conversation_id}/documents`
 
 ```json
 {
@@ -448,24 +373,21 @@ Request:
 }
 ```
 
-Validation:
+The conversation must belong to the selected organization. The authenticated
+user is stored as `uploaded_by_user_id`.
 
-- `filename`: 1–255 non-whitespace characters
-- `file_type`: `pdf`, `docx`, or `txt` (input is normalized to lowercase)
+- `file_type`: `pdf`, `docx`, or `txt`
 - `file_size`: positive integer in bytes
+- Success: `201 Created`
 
-Success: `201 Created`, returning the document object.
+## Dashboard
 
-## Dashboard endpoints
+### Message count
 
-### Count messages
+`GET /api/v1/organizations/{organization_id}/dashboard/messages/count`
 
-`GET /api/v1/dashboard/messages/count`
-
-Counts user and assistant messages across all conversations owned by the
-authenticated user.
-
-Success: `200 OK`
+Counts user and assistant messages across the selected organization's
+conversations.
 
 ```json
 {
@@ -475,10 +397,12 @@ Success: `200 OK`
 
 ### Dashboard root
 
-`GET /api/v1/dashboard`
+`GET /api/v1/organizations/{organization_id}/dashboard`
 
-This route currently returns placeholder data and is not yet a functional
-dashboard-summary endpoint.
+Currently returns placeholder data after validating membership.
 
+## System
 
+- `GET /` — placeholder root response
+- `GET /health` — process-level health check; does not query PostgreSQL
 
