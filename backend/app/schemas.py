@@ -113,6 +113,10 @@ class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ConversationSearchResult(ConversationResponse):
+    matched_messages: list[MessageResponse]
+
+
 class MessageCountResponse(BaseModel):
     total_messages: int
 

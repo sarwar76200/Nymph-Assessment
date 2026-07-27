@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import case, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import CurrentUser, DatabaseSession
@@ -14,6 +14,7 @@ from app.models import Conversation, Message, User
 from app.schemas import (
     ConversationCreate,
     ConversationResponse,
+    ConversationSearchResult,
     ConversationStatusUpdate,
     ConversationTitleUpdate,
     MessageCreate,
@@ -150,12 +151,53 @@ async def create_conversation(
     return ConversationResponse.model_validate(conversation)
 
 
-@router.get("/search", response_model=PlaceholderResponse)
+@router.get(
+    "/search",
+    response_model=list[ConversationSearchResult],
+)
 async def search_conversations(
+    db: DatabaseSession,
+    current_user: CurrentUser,
     query: str = Query(min_length=1, max_length=200),
-) -> PlaceholderResponse:
-    del query
-    return PlaceholderResponse()
+) -> list[ConversationSearchResult]:
+    search_term = query.strip().lower()
+    if not search_term:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Search query must not be blank",
+        )
+
+    result = await db.execute(
+        select(Conversation, Message)
+        .join(
+            Message,
+            Message.conversation_id == Conversation.id,
+        )
+        .where(
+            Conversation.user_id == current_user.id,
+            func.strpos(func.lower(Message.content), search_term) > 0,
+        )
+        .order_by(
+            Conversation.updated_at.desc(),
+            Message.created_at.asc(),
+        )
+    )
+
+    conversations: dict[UUID, ConversationSearchResult] = {}
+    for conversation, message in result.all():
+        if conversation.id not in conversations:
+            conversation_data = ConversationResponse.model_validate(
+                conversation
+            )
+            conversations[conversation.id] = ConversationSearchResult(
+                **conversation_data.model_dump(),
+                matched_messages=[],
+            )
+        conversations[conversation.id].matched_messages.append(
+            MessageResponse.model_validate(message)
+        )
+
+    return list(conversations.values())
 
 
 @router.get("/{conversation_id}", response_model=PlaceholderResponse)
@@ -247,6 +289,43 @@ async def list_messages(
         .order_by(Message.created_at.asc())
         .limit(limit)
         .offset(offset)
+    )
+    messages = result.scalars().all()
+    return [
+        MessageResponse.model_validate(message)
+        for message in messages
+    ]
+
+
+@router.get(
+    "/{conversation_id}/messages/search",
+    response_model=list[MessageResponse],
+)
+async def search_conversation_messages(
+    conversation_id: UUID,
+    db: DatabaseSession,
+    current_user: CurrentUser,
+    query: str = Query(min_length=1, max_length=200),
+) -> list[MessageResponse]:
+    search_term = query.strip().lower()
+    if not search_term:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Search query must not be blank",
+        )
+
+    conversation = await get_user_conversation(
+        conversation_id,
+        current_user,
+        db,
+    )
+    result = await db.execute(
+        select(Message)
+        .where(
+            Message.conversation_id == conversation.id,
+            func.strpos(func.lower(Message.content), search_term) > 0,
+        )
+        .order_by(Message.created_at.asc())
     )
     messages = result.scalars().all()
     return [
