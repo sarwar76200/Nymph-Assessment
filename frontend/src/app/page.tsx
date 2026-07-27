@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   MessageSquareText,
   MoreHorizontal,
-  Search,
   Settings,
   Sparkles,
 } from "lucide-react";
@@ -24,6 +23,7 @@ import {
   UploadDocumentButton,
 } from "@/components/dashboard-documents";
 import { DashboardUser } from "@/components/dashboard-user";
+import { ConversationSearch } from "@/components/conversation-search";
 
 const navItems = [
   { label: "Overview", icon: LayoutDashboard, active: true },
@@ -95,23 +95,15 @@ function Dashboard() {
       </aside>
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/90 px-5 backdrop-blur md:px-8">
+        <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/90 px-5 backdrop-blur md:px-8">
           <div className="flex items-center gap-3 lg:hidden">
             <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
               <Sparkles size={16} />
             </div>
             <span className="font-bold">Nymph</span>
           </div>
-          <div className="relative hidden w-full max-w-sm md:block">
-            <Search
-              size={16}
-              className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              aria-label="Search conversations"
-              placeholder="Search conversations..."
-              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-9 text-sm outline-none placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
-            />
+          <div className="hidden w-full max-w-sm md:block">
+            <ConversationSearch />
           </div>
           <div className="flex items-center gap-2">
             <button
