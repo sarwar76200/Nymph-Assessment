@@ -121,3 +121,27 @@ class DocumentMetadataCreate(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     file_type: str = Field(pattern=r"^(pdf|docx|txt)$")
     file_size: int = Field(gt=0)
+
+    @field_validator("filename")
+    @classmethod
+    def filename_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Filename must not be blank")
+        return value
+
+    @field_validator("file_type", mode="before")
+    @classmethod
+    def normalize_file_type(cls, value: object) -> object:
+        return value.lower() if isinstance(value, str) else value
+
+
+class DocumentResponse(BaseModel):
+    id: UUID
+    conversation_id: UUID
+    filename: str
+    file_type: str
+    file_size: int
+    uploaded_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
