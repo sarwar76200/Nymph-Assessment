@@ -1,12 +1,18 @@
 1. This is a customer-facing dashboard where users manage
     their own AI support conversations and uploaded documents.
 
-2. Documents are associated with a conversation [to be clarified].
+2. Documents are associated with a conversation [clarified].
 
 3. Title of the conversation is entered manually for now.
 
 4. Messages are stored under a conversation with roles and timestamps.
 
 5. Use only substring matching for searching.
+
+New requirement - Organizations
+
+6. All members in an organization have equal permission for now.
+
+7.
 
 TODO

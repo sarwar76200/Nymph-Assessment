@@ -1,3 +1,241 @@
 # AI-Ready Customer Support Dashboard
 
-TODO
+A full-stack customer-support dashboard built with Next.js, FastAPI, SQLAlchemy,
+and PostgreSQL. Users can work across multiple organizations, manage
+conversations and document metadata, search message history, and receive
+simulated streaming assistant responses.
+
+## Features
+
+- JWT signup, login, logout, and session restoration
+- Multi-organization membership and organization switching
+- Organization-scoped conversation creation, listing, renaming, status updates,
+  and deletion
+- User and assistant message history
+- Server-Sent Events (SSE) for simulated streaming assistant responses
+- Case-insensitive substring search across conversations or within one
+  conversation
+- PDF, DOCX, and TXT metadata management
+- Message-author and document-uploader attribution
+- Organization-scoped dashboard statistics
+- Responsive Next.js interface
+
+## Architecture
+
+The repository contains two applications:
+
+- `frontend/`: Next.js App Router application
+- `backend/`: FastAPI REST and SSE API
+
+PostgreSQL uses a shared-schema multi-tenant design. A user may belong to
+multiple organizations, but each conversation belongs to exactly one
+organization. Messages and documents derive their organization through their
+conversation.
+
+JWTs identify users only. The selected organization UUID is included in scoped
+API paths, allowing users to switch organizations without logging in again.
+
+## Technology
+
+Frontend:
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Lucide React
+
+Backend:
+
+- FastAPI
+- SQLAlchemy 2
+- PostgreSQL on Aiven
+- Psycopg 3
+- Pydantic
+- Argon2 password hashing
+- PyJWT
+
+## Repository structure
+
+```text
+.
+├── backend/
+│   ├── app/
+│   │   ├── routes/
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── dependencies.py
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   └── security.py
+│   ├── migrations/
+│   ├── API Docs.md
+│   ├── Schema.md
+│   └── requirements.txt
+├── frontend/
+│   └── src/
+└── resources/
+```
+
+## Prerequisites
+
+- Node.js 20 or newer
+- npm
+- Python 3.11 or newer
+- PostgreSQL database
+
+## Database setup
+
+For a new database, execute the PostgreSQL DDL in
+[`backend/Schema.md`](backend/Schema.md).
+
+For an existing single-user database, back it up and run these migrations in
+order during a maintenance window:
+
+1. `backend/migrations/001_create_organization_tables.sql`
+2. `backend/migrations/002_add_multi_organization_columns.sql`
+3. `backend/migrations/003_backfill_multi_organization_data.sql`
+4. `backend/migrations/004_add_multi_organization_constraints.sql`
+5. `backend/migrations/005_remove_legacy_conversation_owner.sql`
+
+Do not run both the fresh-database DDL and the existing-data migrations against
+the same database.
+
+## Backend setup
+
+Create `backend/.env`:
+
+```env
+DATABASE_URL=postgresql+psycopg://user:password@host:port/database?sslmode=require
+JWT_SECRET_KEY=replace-with-a-random-secret-of-at-least-32-characters
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+```
+
+Install dependencies and start the API:
+
+```bash
+cd backend
+python -m venv .venv
+```
+
+Activate the environment on Windows:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Activate it on macOS or Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+Then run:
+
+```bash
+python -m pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+The API is available at `http://localhost:8000`.
+
+Interactive documentation:
+
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## Frontend setup
+
+Create `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+Install dependencies and start Next.js:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+## Organization-scoped API
+
+Protected requests use:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+Organization resources include the selected UUID:
+
+```text
+/api/v1/organizations/{organization_id}/conversations
+/api/v1/organizations/{organization_id}/documents
+/api/v1/organizations/{organization_id}/dashboard/messages/count
+```
+
+On signup, the backend creates a personal organization automatically. Users can
+create additional organizations and add existing users by email.
+
+See [`backend/API Docs.md`](backend/API%20Docs.md) for endpoint details,
+validation rules, status codes, and SSE events.
+
+## Useful commands
+
+Frontend:
+
+```bash
+npm run dev
+npm run lint
+npm run build
+npm run start
+```
+
+Backend:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+## Deployment
+
+Recommended deployment:
+
+- Frontend: Vercel
+- Backend: Render
+- Database: Aiven PostgreSQL
+
+Set `NEXT_PUBLIC_API_URL` to the deployed backend URL. Configure the backend
+environment variables on Render and ensure its CORS allowlist contains the
+deployed frontend origin.
+
+Suggested Render commands:
+
+```text
+Build: pip install -r requirements.txt
+Start: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+Health check: /health
+```
+
+## Current limitations
+
+- Assistant responses are simulated Lorem Ipsum rather than generated by an AI
+  model.
+- Document file contents are not stored or processed; only metadata is saved.
+- Search uses database substring matching rather than full-text or vector
+  search.
+- Organization members currently have equal permissions.
+- Database migrations are SQL scripts and are not managed by Alembic.
+- The health endpoint verifies the API process but not database connectivity.
+
+## Documentation
+
+- [API documentation](backend/API%20Docs.md)
+- [Database schema and DDL](backend/Schema.md)
+- [Assessment assumptions](resources/assumptions.txt)
