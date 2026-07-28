@@ -5,8 +5,6 @@
 - Local base URL: `http://localhost:8000`
 - API prefix: `/api/v1`
 - Swagger UI: `/docs`
-- ReDoc: `/redoc`
-- OpenAPI schema: `/openapi.json`
 
 JSON requests use `Content-Type: application/json`.
 

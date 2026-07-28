@@ -364,6 +364,7 @@ export function RecentConversations() {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
     null,
   );
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<Conversation | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
@@ -390,6 +391,7 @@ export function RecentConversations() {
       promoteConversation(detail.conversation);
       setSelectedConversation(detail.conversation);
       setSelectedMessageId(detail.messageId);
+      setIsChatMinimized(false);
       setOpenMenuId(null);
     };
 
@@ -583,6 +585,7 @@ export function RecentConversations() {
                 onOpen={() => {
                   setSelectedConversation(conversation);
                   setSelectedMessageId(null);
+                  setIsChatMinimized(false);
                   setOpenMenuId(null);
                 }}
                 onToggleMenu={() =>
@@ -602,6 +605,8 @@ export function RecentConversations() {
         <ChatWindow
           conversation={selectedConversation}
           targetMessageId={selectedMessageId}
+          isMinimized={isChatMinimized}
+          onMinimizedChange={setIsChatMinimized}
           onDismiss={() => {
             setSelectedConversation(null);
             setSelectedMessageId(null);
@@ -926,6 +931,8 @@ function ConversationTitleDialog({
 type ChatWindowProps = {
   conversation: Conversation;
   targetMessageId: string | null;
+  isMinimized: boolean;
+  onMinimizedChange: (isMinimized: boolean) => void;
   onDismiss: () => void;
   onStatusChanged: () => void;
   onMessageCreated: (conversationId: string, updatedAt: string) => void;
@@ -934,13 +941,14 @@ type ChatWindowProps = {
 function ChatWindow({
   conversation,
   targetMessageId,
+  isMinimized,
+  onMinimizedChange,
   onDismiss,
   onStatusChanged,
   onMessageCreated,
 }: ChatWindowProps) {
   const { activeOrganizationId, handleOrganizationForbidden } =
     useOrganization();
-  const [isMinimized, setIsMinimized] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [closeError, setCloseError] = useState("");
@@ -1047,7 +1055,7 @@ function ChatWindow({
           type="button"
           aria-label={isMinimized ? "Maximize chat" : "Minimize chat"}
           onClick={() => {
-            setIsMinimized((minimized) => !minimized);
+            onMinimizedChange(!isMinimized);
             setIsMenuOpen(false);
           }}
           className="flex size-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
