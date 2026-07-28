@@ -1,8 +1,8 @@
 # Database Schema
 
-The backend uses PostgreSQL on Aiven with a shared-schema, multi-organization
-tenancy model. Users may belong to multiple organizations, while each
-conversation belongs to exactly one organization.
+The backend uses PostgreSQL on Aiven. All users and organizations are stored
+in the same set of tables. Users may belong to multiple organizations, while
+each conversation belongs to exactly one organization.
 
 ## Relationships
 
@@ -190,8 +190,9 @@ Run the migration files in order:
 5. `005_remove_legacy_conversation_owner.sql`
 
 The stages create one personal organization per existing user, add nullable
-columns, backfill tenancy and attribution, validate the migrated values, apply
-constraints, and finally remove `conversations.user_id`.
+columns, connect existing data to its organization and creator, validate the
+migrated values, apply constraints, and finally remove
+`conversations.user_id`.
 
 Back up the database first and deploy the organization-aware backend
 immediately after the migration.

@@ -1,4 +1,4 @@
--- Stage 3: Backfill organization tenancy and user attribution.
+-- Stage 3: Connect existing data to organizations and users.
 
 BEGIN;
 

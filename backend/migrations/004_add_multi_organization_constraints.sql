@@ -1,4 +1,4 @@
--- Stage 4: Enforce organization tenancy and attribution relationships.
+-- Stage 4: Enforce organization ownership and user attribution.
 
 BEGIN;
 

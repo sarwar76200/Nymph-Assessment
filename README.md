@@ -27,10 +27,10 @@ The repository contains two applications:
 - `frontend/`: Next.js App Router application
 - `backend/`: FastAPI REST and SSE API
 
-PostgreSQL uses a shared-schema multi-tenant design. A user may belong to
-multiple organizations, but each conversation belongs to exactly one
-organization. Messages and documents derive their organization through their
-conversation.
+PostgreSQL stores all users and organizations in the same set of tables. A
+user may belong to multiple organizations, but each conversation belongs to
+exactly one organization. Messages and documents belong to an organization
+through their conversation.
 
 JWTs identify users only. The selected organization UUID is included in scoped
 API paths, allowing users to switch organizations without logging in again.
