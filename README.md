@@ -14,7 +14,7 @@ conversations and documents, search message history, and receive streamed assist
 - Server-Sent Events (SSE) for simulated streaming assistant responses
 - Case-insensitive substring search across an organization's conversations;
   per-conversation search is available through the backend API
-- PDF, DOCX, and TXT metadata management
+- PDF, DOCX, and TXT files uploads
 - Organization-scoped message totals and counts from the loaded conversation
   and document lists
 - Responsive Next.js interface
@@ -25,13 +25,9 @@ conversations and documents, search message history, and receive streamed assist
 The assessment had several ambiguities, therefore I had to make a few assumptions
 - This is a customer-facing dashboard where organization members manage
    shared AI support conversations and document metadata in their workspace.
-
 - Documents are associated with a conversation [clarified].
-
 - Title of the conversation is entered manually for now.
-
 - Messages are stored under a conversation with roles and timestamps.
-
 - Use only substring matching for searching.
 
 #### New requirement - Organizations
