@@ -259,4 +259,3 @@ Health check: /health
 - [API documentation](backend/API%20Docs.md)
 - [Database schema](backend/Schema.md)
 - [ER diagram](backend/ER%20Diagram%20Updated.svg)
-- [Assessment assumptions](resources/assumptions.txt)
