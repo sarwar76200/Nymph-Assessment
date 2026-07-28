@@ -19,6 +19,25 @@ conversations and documents, search message history, and receive streamed assist
   and document lists
 - Responsive Next.js interface
 
+
+## Assumptions
+
+The assessment had several ambiguities, therefore I had to make a few assumptions
+- This is a customer-facing dashboard where organization members manage
+   shared AI support conversations and document metadata in their workspace.
+
+- Documents are associated with a conversation [clarified].
+
+- Title of the conversation is entered manually for now.
+
+- Messages are stored under a conversation with roles and timestamps.
+
+- Use only substring matching for searching.
+
+#### New requirement - Organizations
+
+- All members in an organization have equal permissions for now.
+
 ## Architecture
 
 The repository contains two applications:

@@ -1,4 +1,1 @@
-This file described the original database before organizations were added and
-is no longer current.
-
 Use backend/Schema.md for the current table definitions and relationships.
