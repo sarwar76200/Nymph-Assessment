@@ -1,4 +1,4 @@
-# Nymph Customer Support Dashboard Frontend
+# AI-Ready Customer Support Dashboard Frontend
 
 This directory contains the Next.js App Router frontend for the customer
 support dashboard. See the [root README](../README.md) for full backend,

@@ -1,4 +1,4 @@
-# Nymph Customer Support API
+# AI-Ready Customer Support API
 
 ## Basics
 
@@ -166,7 +166,7 @@ Returns the organizations the current user belongs to, sorted by name.
 
 ```json
 {
-  "name": "Nymph Support"
+  "name": "Nymph Solutions Support"
 }
 ```
 

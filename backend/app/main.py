@@ -12,7 +12,7 @@ from app.routes import (
 from app.schemas import PlaceholderResponse
 
 app = FastAPI(
-    title="Nymph Customer Support API",
+    title="AI-Ready Customer Support API",
     version="0.1.0",
     description="Placeholder REST API for the customer support dashboard.",
 )
