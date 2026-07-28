@@ -82,7 +82,7 @@ data is retained.
 ## 3. Engineering Decisions
 
 
-### Decision 1: React Context and local state instead of Redux
+### Decision 1: React Context API and local state instead of Redux
 
 **What I chose**
 
