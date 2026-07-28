@@ -2,6 +2,7 @@
 
 import {
   AlertCircle,
+  ChevronRight,
   FileText,
   LoaderCircle,
   Plus,
@@ -303,14 +304,20 @@ export function RecentDocuments() {
           <h2 className="font-semibold">Recent documents</h2>
           <p className="mt-0.5 text-xs text-slate-400">Knowledge added recently</p>
         </div>
-        <button
+        {/* <button
           type="button"
           aria-label="Add document"
           onClick={openUpload}
           className="flex size-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
         >
           <Plus size={16} />
-        </button>
+        </button> */}
+        <a
+          href="#"
+          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+        >
+          View all <ChevronRight size={14} />
+        </a>
       </div>
 
       {isLoading ? (
