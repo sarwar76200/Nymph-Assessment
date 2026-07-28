@@ -38,8 +38,8 @@ User:
 ```json
 {
   "id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
-  "email": "alex@example.com",
-  "name": "Alex Smith",
+  "email": "abrar@example.com",
+  "name": "Abrar Ahmed",
   "created_at": "2026-07-28T12:00:00Z"
 }
 ```
@@ -49,7 +49,7 @@ Organization:
 ```json
 {
   "id": "ff8a3d86-d702-44ef-a1f7-c369528cfe2d",
-  "name": "Alex Smith's Organization",
+  "name": "Abrar Ahmed's Organization",
   "created_at": "2026-07-28T12:00:00Z",
   "updated_at": "2026-07-28T12:00:00Z"
 }
@@ -106,8 +106,8 @@ Document metadata:
 
 ```json
 {
-  "name": "Alex Smith",
-  "email": "alex@example.com",
+  "name": "Abrar Ahmed",
+  "email": "abrar@example.com",
   "password": "password123"
 }
 ```
@@ -121,8 +121,8 @@ Returns `201 Created` with:
   "token_type": "bearer",
   "user": {
     "id": "a2013510-e5e3-4fd9-8f18-577109f9419d",
-    "email": "alex@example.com",
-    "name": "Alex Smith",
+    "email": "abrar@example.com",
+    "name": "Abrar Ahmed",
     "created_at": "2026-07-28T12:00:00Z"
   }
 }
@@ -136,7 +136,7 @@ Duplicate email returns `409 Conflict`.
 
 ```json
 {
-  "email": "alex@example.com",
+  "email": "abrar@example.com",
   "password": "password123"
 }
 ```

@@ -177,7 +177,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 id="name"
                 label="Full name"
                 type="text"
-                placeholder="Alex Smith"
+                placeholder="Abrar Ahmed"
                 autoComplete="name"
                 icon={<User size={17} />}
               />
