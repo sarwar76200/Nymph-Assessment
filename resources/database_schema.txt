@@ -1,42 +1,4 @@
-users
------
-id (UUID, PK)
-email
-password_hash
-name
-created_at
-updated_at
+This file described the original database before organizations were added and
+is no longer current.
 
-
-
-conversations
--------------
-id (UUID, PK)
-user_id (FK -> users.id)
-title
-status           -- active | completed
-created_at
-updated_at
-
-
-
-messages
---------
-id (UUID, PK)
-conversation_id (FK -> conversations.id)
-role            -- user | assistant
-content         -- TEXT
-created_at
-
-
-
-documents
----------
-id (UUID, PK)
-conversation_id (FK -> conversations.id)
-filename
-file_type
-file_size
-uploaded_at
-
-TODO
+Use backend/Schema.md for the current table definitions and relationships.

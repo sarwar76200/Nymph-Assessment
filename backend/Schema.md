@@ -1,11 +1,14 @@
 # Database Schema
 
-The backend uses PostgreSQL on Aiven. Users and Organization are stored in seperate tables with a many-to-many relation between them. Users may belong to multiple organizations, while
-each conversation belongs to exactly one organization.
+The backend uses PostgreSQL on Aiven. Users and organizations are stored in
+separate tables with a many-to-many relationship between them. Users may
+belong to multiple organizations, while each conversation belongs to exactly
+one organization.
 
 ## Relationships
 
-- A user may belong to many organizations (and vise versa) through `organization_memberships`.
+- A user may belong to many organizations, and an organization may contain
+  many users, through `organization_memberships`.
 - An organization owns many conversations.
 - A user may create conversations, send messages, and upload documents.
 - A conversation contains messages and documents (metadata for now).
@@ -52,7 +55,7 @@ Table: `conversations`
 - `created_at`, `updated_at`: timestamps
 
 Deleting an organization cascades to its conversations. Deleting a user makes
-`created_by_user_id` = `NULL`, so conversation history don't get lost.
+`created_by_user_id` = `NULL`, so conversation history is retained.
 
 ## Messages
 
@@ -79,3 +82,6 @@ Table: `documents`
 - `file_type`: required, `VARCHAR(10)`, one of `pdf`, `docx`, or `txt`
 - `file_size`: required, positive, `BIGINT`, stored in bytes
 - `uploaded_at`: timestamp
+
+Allowed conversation statuses, message roles, document types, and positive
+file sizes are validated by the backend request schemas.

@@ -1,5 +1,5 @@
-1. This is a customer-facing dashboard where users manage
-    their own AI support conversations and uploaded documents.
+1. This is a customer-facing dashboard where organization members manage
+   shared AI support conversations and document metadata in their workspace.
 
 2. Documents are associated with a conversation [clarified].
 
@@ -11,8 +11,13 @@
 
 New requirement - Organizations
 
-6. All members in an organization have equal permission for now.
+6. All members in an organization have equal permissions for now.
 
-7.
-
-TODO
+7. Metadata and messages are interlaced chronologically in a unified
+   conversation timeline.
+   - Metadata events are displayed at their recorded timestamp alongside
+     messages, rather than in a separate activity feed.
+   - Metadata entries are visually distinct from user and assistant messages
+     so they provide context without being mistaken for chat content.
+   - A single timeline preserves the sequence of conversation activity and
+     lets users understand what changed in the context in which it happened.

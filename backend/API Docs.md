@@ -267,8 +267,8 @@ Valid statuses are `active` and `completed`.
 
 `DELETE {base_path}/{conversation_id}`
 
-Returns `204 No Content`. Database cascades remove associated messages and
-document metadata.
+Returns `204 No Content`. Associated messages and document metadata are also
+removed.
 
 ## Messages
 
