@@ -10,7 +10,7 @@ export type Conversation = {
     updated_at: string;
 };
 
-export type ConversationContextValue = {
+type ConversationContextValue = {
     conversations: Conversation[];
     isLoading: boolean;
     error: string;

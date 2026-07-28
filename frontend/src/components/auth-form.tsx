@@ -117,7 +117,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           </span>
           <span>
             <span className="block text-base font-bold tracking-tight">Nymph Support</span>
-            <span className="block text-[11px] font-medium text-slate-400">AI workspace</span>
+            <span className="block text-[11px] font-medium text-slate-400">Customer portal</span>
           </span>
         </Link>
 

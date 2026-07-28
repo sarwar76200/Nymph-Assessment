@@ -65,7 +65,7 @@ function Dashboard() {
           </div>
           <div>
             <p className="text-[15px] font-bold tracking-tight">Nymph Support</p>
-            <p className="text-[11px] font-medium text-slate-400">AI workspace</p>
+            <p className="text-[11px] font-medium text-slate-400">Customer portal</p>
           </div>
         </div>
 

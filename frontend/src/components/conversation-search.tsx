@@ -269,11 +269,10 @@ export function ConversationSearch() {
                             </p>
                           </div>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                              result.status === "active"
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${result.status === "active"
                                 ? "bg-amber-50 text-amber-700"
                                 : "bg-emerald-50 text-emerald-700"
-                            }`}
+                              }`}
                           >
                             {result.status}
                           </span>
@@ -302,11 +301,10 @@ export function ConversationSearch() {
                             >
                               <span className="line-clamp-2">
                                 <span
-                                  className={`font-semibold ${
-                                    message.role === "user"
+                                  className={`font-semibold ${message.role === "user"
                                       ? "text-indigo-600"
                                       : "text-slate-700"
-                                  }`}
+                                    }`}
                                 >
                                   {message.role === "user" ? "User" : "Assistant"}:
                                 </span>{" "}
