@@ -2,8 +2,7 @@
 
 A full-stack customer-support dashboard built with Next.js, FastAPI, SQLAlchemy,
 and PostgreSQL. Users can work across multiple organizations, manage
-conversations and document metadata, search message history, and receive
-simulated streaming assistant responses.
+conversations and documents, search message history, and receive streamed assistant responses.
 
 ## Features
 
