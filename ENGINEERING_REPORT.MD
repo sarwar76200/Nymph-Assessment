@@ -6,7 +6,7 @@ This project is a full-stack, customer-facing dashboard for working with
 AI-assisted support conversations. A user can sign up, log in, work across
 multiple organizations, create and manage conversations, exchange messages
 with an AI assistant, search message history, and attach PDF, DOCX,
-or TXT document metadata to a conversation.
+or TXT documents to a conversation.
 
 The dashboard includes conversation and message statistics, recent
 conversations, recent documents, user information, organization switching.
@@ -51,7 +51,7 @@ after a refresh. Protected pages use an authentication guard.
 
 Messages are rendered optimistically. A submitted user message appears
 immediately, while the frontend reads the assistant response from a streamed
-HTTP body and progressively updates the assistant bubble.
+HTTP body and progressively updates the assistant message.
 
 ### Backend
 
@@ -68,7 +68,7 @@ another organization's data.
 
 ### Database
 
-PostgreSQL stores all users and organizations in the same set of tables. The
+PostgreSQL stores all users and organizations in seperate tables. The
 `organization_memberships` table connects users to organizations, allowing one
 user to belong to several organizations. Each conversation belongs to one
 organization, while messages and documents belong to a conversation.
@@ -86,26 +86,26 @@ data is retained.
 
 **What I chose**
 
-I divided shared frontend state into focused providers for organizations,
-conversations, and documents. Short-lived interaction state remains in the
-component that owns it. Optimistic updates are used where an immediate visual
-response is important.
+I kept shared dashboard data in a few React context providers: one for
+organizations, one for conversations, and one for documents. Temporary UI
+state, such as open dialogs or the chat input, stays in the components itself.
+When a user sends a message, the UI shows it right away instead of
+waiting for the full page to reload.
 
 **Alternatives considered**
 
-- A Redux store with slices and asynchronous actions
-- Passing state through component props
-- Refetching the entire dashboard after every mutation
-- Introducing a server-state library such as TanStack Query
+- Using Redux for all shared state
+- Passing state down through many component props
+- Reloading the whole dashboard after every change
+- Using a data-fetching library such as TanStack Query
 
 **Why I selected it**
 
-The dashboard has a moderate number of clearly separated state domains.
-Context avoids prop drilling without adding store configuration, action
-creators, selectors, or another dependency. Local updates also prevent
-unpleasant full-dashboard refreshes after sending a message. If the product
-grows to require advanced caching, request deduplication, or offline support, a
-server-state library would be a sensible next step.
+This app is not large enough to need Redux. The shared data is limited and
+easy to split by topic, so React Context is enough. Updating only the parts
+that changed also keeps the UI responsive. If the app grows and needs better
+caching or offline support later, a library like TanStack Query would be a
+good next step.
 
 
 ### Decision 2: Server-Sent Events for assistant responses

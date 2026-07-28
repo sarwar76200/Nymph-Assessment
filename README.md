@@ -34,6 +34,10 @@ through their conversation.
 JWTs identify users only. The selected organization UUID is included in scoped
 API paths, allowing users to switch organizations without logging in again.
 
+### ER diagram
+
+![ER diagram](backend/ER%20Diagram%20Updated.svg)
+
 ## Technology
 
 Frontend:
@@ -238,5 +242,6 @@ Health check: /health
 ## Documentation
 
 - [API documentation](backend/API%20Docs.md)
-- [Database schema and DDL](backend/Schema.md)
+- [Database schema](backend/Schema.md)
+- [ER diagram](backend/ER%20Diagram%20Updated.svg)
 - [Assessment assumptions](resources/assumptions.txt)
