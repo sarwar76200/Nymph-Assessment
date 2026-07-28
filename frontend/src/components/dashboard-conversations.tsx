@@ -1024,7 +1024,13 @@ function ChatWindow({
             {conversation.title}
           </h2>
           {!isMinimized && (
-            <p className="mt-0.5 text-[11px] text-slate-400">AI Support Agent</p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <span
+                aria-hidden="true"
+                className="size-[7px] rounded-full bg-green-500"
+              />
+              AI Support Agent
+            </p>
           )}
         </div>
         <div className="relative">
