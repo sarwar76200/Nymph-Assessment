@@ -21,22 +21,7 @@ import {
   storeOrganizationId,
 } from "@/lib/organizations";
 
-type OrganizationContextValue = {
-  organizations: Organization[];
-  activeOrganization: Organization | null;
-  activeOrganizationId: string | null;
-  isLoading: boolean;
-  isReady: boolean;
-  error: string;
-  setActiveOrganization: (organizationId: string) => void;
-  createOrganization: (name: string) => Promise<Organization>;
-  reloadOrganizations: () => Promise<void>;
-  handleOrganizationForbidden: () => Promise<void>;
-};
-
-const OrganizationContext = createContext<OrganizationContextValue | null>(
-  null,
-);
+import { OrganizationContext } from "@/context/OrganizationContext";
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);

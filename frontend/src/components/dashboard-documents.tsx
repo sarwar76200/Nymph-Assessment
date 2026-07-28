@@ -24,25 +24,8 @@ import { useOrganization } from "@/components/organization-provider";
 import { clearSession, getSessionToken } from "@/lib/auth";
 import { organizationApiUrl } from "@/lib/organizations";
 
-type DocumentMetadata = {
-  id: string;
-  conversation_id: string;
-  uploaded_by_user_id: string | null;
-  filename: string;
-  file_type: "pdf" | "docx" | "txt";
-  file_size: number;
-  uploaded_at: string;
-};
+import { type DocumentMetadata, DocumentContext } from "@/context/DocumentContext";
 
-type DocumentContextValue = {
-  documents: DocumentMetadata[];
-  isLoading: boolean;
-  error: string;
-  openUpload: () => void;
-  reload: () => void;
-};
-
-const DocumentContext = createContext<DocumentContextValue | null>(null);
 const ALLOWED_FILE_TYPES = ["pdf", "docx", "txt"] as const;
 
 export function DocumentProvider({ children }: { children: ReactNode }) {

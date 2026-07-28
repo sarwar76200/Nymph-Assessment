@@ -30,29 +30,8 @@ import { useOrganization } from "@/components/organization-provider";
 import { clearSession, getSessionToken } from "@/lib/auth";
 import { organizationApiUrl } from "@/lib/organizations";
 
-export type Conversation = {
-  id: string;
-  organization_id: string;
-  created_by_user_id: string | null;
-  title: string;
-  status: "active" | "completed";
-  created_at: string;
-  updated_at: string;
-};
+import { type Conversation, ConversationContext } from "@/context/ConversationContext";
 
-type ConversationContextValue = {
-  conversations: Conversation[];
-  isLoading: boolean;
-  error: string;
-  reload: () => void;
-  touchConversation: (conversationId: string, updatedAt: string) => void;
-  promoteConversation: (conversation: Conversation) => void;
-  totalMessages: number | null;
-  messageCountRevision: number;
-  incrementMessageCount: (amount: number) => void;
-};
-
-const ConversationContext = createContext<ConversationContextValue | null>(null);
 
 export function ConversationProvider({ children }: { children: ReactNode }) {
   const { activeOrganizationId, handleOrganizationForbidden } =
@@ -257,8 +236,8 @@ export function MessageCountCard() {
           <p
             key={messageCountRevision}
             className={`text-2xl font-bold tracking-tight ${messageCountRevision > 0
-                ? "animate-[slide-from-bottom_300ms_ease-out]"
-                : ""
+              ? "animate-[slide-from-bottom_300ms_ease-out]"
+              : ""
               }`}
           >
             {totalMessages}
@@ -693,8 +672,8 @@ function ConversationRow({
   return (
     <div
       className={`flex items-center border-l-3 transition ${isSelected
-          ? "border-indigo-500 bg-indigo-50/80"
-          : "border-transparent hover:bg-slate-50/70"
+        ? "border-indigo-500 bg-indigo-50/80"
+        : "border-transparent hover:bg-slate-50/70"
         }`}
     >
       <button
@@ -713,8 +692,8 @@ function ConversationRow({
             </h3>
             <span
               className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize sm:inline ${conversation.status === "active"
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-emerald-50 text-emerald-700"
+                ? "bg-amber-50 text-amber-700"
+                : "bg-emerald-50 text-emerald-700"
                 }`}
             >
               {conversation.status}
