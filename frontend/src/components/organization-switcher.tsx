@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, Fragment, ReactNode, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useOrganization } from "@/components/organization-provider";
 
@@ -210,7 +211,7 @@ function CreateOrganizationDialog({
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-[2px]">
       <section
         role="dialog"
@@ -282,6 +283,7 @@ function CreateOrganizationDialog({
           </div>
         </form>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
