@@ -85,3 +85,9 @@ Table: `documents`
 
 Allowed conversation statuses, message roles, document types, and positive
 file sizes are validated by the backend request schemas.
+
+
+## ER diagram
+
+![ER diagram](ER%20Diagram%20Updated.svg)
+
